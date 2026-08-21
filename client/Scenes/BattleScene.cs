@@ -29,15 +29,42 @@ public class BattleScene(IgraGame game) : Scene(game)
                     if (!_dispHp.ContainsKey(c.Uid)) _dispHp[c.Uid] = c.Hp;
                 break;
             case "action_result":
+            {
                 _log = payload.Str("log") ?? "";
                 Sfx.Hit();
+                var m = System.Text.RegularExpressions.Regex.Match(_log, @"на (\d+)");
+                int dmg = m.Success ? int.Parse(m.Groups[1].Value) : 0;
+                bool reaction = _log.Contains("Реакция");
+                var victim = _view.MyChars.Concat(_view.FoeChars)
+                    .FirstOrDefault(c => c.DefId.Length > 0 && _log.Contains(c.DefId));
+                if (victim != null)
+                {
+                    var r = CardRect(victim);
+                    var center = new Vector2(r.X + r.Width / 2, r.Y + 20);
+                    if (dmg > 0)
+                    {
+                        Fx.FloatText(center + new Vector2(0, -6), $"-{dmg}",
+                            reaction ? Color.Gold : Color.OrangeRed, reaction ? 30 : 24);
+                        Fx.Burst(center, Ru.ElementColor(victim.Element), dmg >= 10 ? 22 : 12, dmg >= 10 ? 220 : 150);
+                        Fx.Shake(reaction || dmg >= 10 ? 7 : 4);
+                        if (reaction) Fx.Flash(Color.Gold, 0.10f);
+                    }
+                    if (_log.Contains("пал!"))
+                    {
+                        Sfx.Death();
+                        Fx.Burst(new Vector2(r.X + r.Width / 2, r.Y + r.Height / 2), Color.Gray, 26, 190);
+                        Fx.Shake(9, 0.3f);
+                    }
+                }
                 break;
+            }
             case "round_start":
                 _log = $"— Раунд {payload.Int("round")} —";
                 break;
             case "game_over":
                 var win = payload.Str("winner") == "you";
-                if (win) Sfx.Win(); else Sfx.Lose();
+                if (win) { Sfx.Win(); Fx.Flash(Color.Gold, 0.35f); }
+                else { Sfx.Lose(); Fx.Flash(Color.Firebrick, 0.3f); }
                 G.Feed.Add(win ? "Победа! Награда начислена." : "Поражение. Есть утешительная пыль.");
                 G.Scene = new MenuScene(G);
                 break;
@@ -104,10 +131,15 @@ public class BattleScene(IgraGame game) : Scene(game)
                 G.Panel(batch, new Rectangle(r.X - 2, r.Y - 2, r.Width + 4, r.Height + 4), Color.Transparent,
                     new Color((byte)255, (byte)215, (byte)0, (byte)(120 + 100 * pulse)));
 
-            G.DrawString(batch, r.X + 10, r.Y + 8, Ru.Name(c.DefId), Color.White, 18);
-            G.DrawString(batch, r.X + 10, r.Y + 32, Ru.ElementRu(c.Element), ElColor(c.Element), 15);
+            G.DrawString(batch, r.X + 10, r.Y + 8, Ru.Name(c.DefId), Color.White, 17);
+            G.DrawString(batch, r.X + 10, r.Y + 30, Ru.ElementRu(c.Element), ElColor(c.Element), 14);
             int rar = Ru.Info(c.DefId)?.Rarity ?? 3;
-            G.DrawString(batch, r.X + 120, r.Y + 32, new string('★', rar), IgraGame.RarityColors[rar], 14);
+            G.DrawString(batch, r.X + r.Width - 62, r.Y + 8, new string('★', rar), IgraGame.RarityColors[rar], 15);
+
+            // портрет (если есть картинка в Assets/chars/{def_id}.png)
+            var portrait = Art.Portrait(c.DefId);
+            if (portrait != null)
+                batch.Draw(portrait, new Rectangle(r.X + r.Width - 58, r.Y + 28, 48, 48), Color.White);
 
             // анимированный HP-бар
             int bw = 175, bh = 16, bx = r.X + 10, byy = r.Y + 56;
@@ -119,10 +151,16 @@ public class BattleScene(IgraGame game) : Scene(game)
             float frac = c.MaxHp > 0 ? (float)cur / c.MaxHp : 0;
             var hpCol = cur <= c.MaxHp / 3 ? Color.OrangeRed : cur <= c.MaxHp * 2 / 3 ? Color.Gold : Color.LightGreen;
             G.FillRect(batch, new Rectangle(bx, byy, (int)(bw * frac), bh), hpCol);
-            G.DrawString(batch, bx, byy, $"{cur}/{c.MaxHp}" + (c.Shield > 0 ? $" (+{c.Shield})" : ""), Color.White, 13);
+            G.DrawString(batch, bx + 2, byy, $"{cur}/{c.MaxHp}" + (c.Shield > 0 ? $" (+{c.Shield})" : ""), Color.White, 13);
 
-            G.DrawString(batch, r.X + 10, r.Y + 82, $"Энергия {c.Energy}/{c.EnergyMax}",
-                c.Energy >= c.EnergyMax ? Color.Gold : Color.Silver, 15);
+            // полоска энергии
+            int ew = 175;
+            G.FillRect(batch, new Rectangle(r.X + 10, r.Y + 80, ew, 8), new Color(20, 20, 40));
+            float eFrac = c.EnergyMax > 0 ? (float)c.Energy / c.EnergyMax : 0;
+            G.FillRect(batch, new Rectangle(r.X + 10, r.Y + 80, (int)(ew * eFrac), 8),
+                c.Energy >= c.EnergyMax ? Color.Gold : new Color(90, 130, 220));
+            G.DrawString(batch, r.X + 10, r.Y + 92, $"Энергия {c.Energy}/{c.EnergyMax}",
+                c.Energy >= c.EnergyMax ? Color.Gold : Color.Silver, 14);
             if (!c.Alive) G.DrawString(batch, r.X + 50, r.Y + 110, "ПОВЕРЖЕН", Color.Red, 22);
 
             if (isEnemy && c.Alive && G.ClickOnce(r))
@@ -130,9 +168,24 @@ public class BattleScene(IgraGame game) : Scene(game)
         }
     }
 
+    private Rectangle CardRect(CharView c)
+    {
+        bool enemy = _view.FoeChars.Contains(c);
+        var list = enemy ? _view.FoeChars : _view.MyChars;
+        int i = list.IndexOf(c);
+        return new Rectangle(340 + Math.Max(i, 0) * 210, enemy ? 60 : 340, 195, 150);
+    }
+
     private void DoSkill()
     {
         if (_view.MyActiveUid.Length == 0) return;
+        var t = _view.FoeChars.FirstOrDefault(c => c.Uid == _selectedFoeUid);
+        if (t != null)
+        {
+            var r = CardRect(t);
+            Fx.Burst(new Vector2(r.X + r.Width / 2, r.Y + r.Height / 2),
+                ElColor(_view.MyChars.FirstOrDefault(x => x.Uid == _view.MyActiveUid)?.Element ?? "day"), 10, 130);
+        }
         Send("use_skill", new { character_uid = _view.MyActiveUid, target_uid = _selectedFoeUid ?? "" });
     }
 

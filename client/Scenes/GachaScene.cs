@@ -11,6 +11,9 @@ namespace Igra.Client.Scenes;
 public class GachaScene(IgraGame game) : Scene(game)
 {
     private readonly List<(int Rarity, string DefId, bool IsNew, int Dust)> _items = new();
+    private readonly List<(int Rarity, string DefId, bool IsNew, int Dust)> _pending = new();
+    private readonly List<float> _ages = new();
+    private float _revealTimer;
     private string _summary = "";
     private bool _inited;
     private int _pullsLeft;
@@ -19,6 +22,8 @@ public class GachaScene(IgraGame game) : Scene(game)
     public override void Draw(SpriteBatch batch, FontSystem fonts)
     {
         if (!_inited) { _inited = true; Send("collection_sync", new { }); }
+
+        UpdateReveal();
 
         G.DrawString(batch, 520, 30, "ГАЧА", Color.Gold, 40);
         G.DrawString(batch, 20, 36, $"Круток: {_pullsLeft}   Пыль: {_dust}", Color.LightGray, 20);
@@ -37,18 +42,48 @@ public class GachaScene(IgraGame game) : Scene(game)
         if (_summary.Length > 0)
             G.DrawString(batch, 60, 232, _summary, Color.YellowGreen, 19);
 
-        // карточки результата
+        // карточки результата (с pop-анимацией)
         int cardW = 150, cardH = 70, x0 = 60, y0 = 280, gap = 12;
         for (int i = 0; i < _items.Count; i++)
         {
             var it = _items[i];
+            float age = _ages.Count > i ? _ages[i] : 1f;
+            float k = Math.Clamp(age * 6f, 0f, 1f);
             int col = i % 7, row = i / 7;
-            var r = new Rectangle(x0 + col * (cardW + gap), y0 + row * (cardH + gap), cardW, cardH);
+            int w = (int)(cardW * (0.4f + 0.6f * k));
+            int h = (int)(cardH * k);
+            var r = new Rectangle(x0 + col * (cardW + gap), y0 + row * (cardH + gap), w, h);
             G.FillRect(batch, r, IgraGame.RarityColors[it.Rarity]);
+            if (h < 14) continue;
             G.DrawString(batch, r.X + 8, r.Y + 8, new string('★', it.Rarity), Color.White, 18);
             G.DrawString(batch, r.X + 8, r.Y + 34, Ru.Name(it.DefId), Color.White, 16);
             G.DrawString(batch, r.X + 8, r.Y + 52,
                 it.IsNew ? "НОВЫЙ!" : $"+{it.Dust} пыли", it.IsNew ? Color.White : Color.LightGray, 16);
+        }
+    }
+
+    private void UpdateReveal()
+    {
+        for (int i = 0; i < _ages.Count; i++) _ages[i] += G.Dt;
+
+        if (_pending.Count == 0) return;
+        _revealTimer -= G.Dt;
+        while (_revealTimer <= 0 && _pending.Count > 0)
+        {
+            var it = _pending[0];
+            _pending.RemoveAt(0);
+            _items.Add(it);
+            _ages.Add(0);
+
+            int col = (_items.Count - 1) % 7, row = (_items.Count - 1) / 7;
+            var center = new Vector2(60 + col * 162 + 75, 280 + row * 82 + 35);
+            Fx.Burst(center, IgraGame.RarityColors[it.Rarity], it.Rarity == 3 ? 8 : 20, it.Rarity == 3 ? 90 : 180);
+
+            if (it.Rarity == 5) { Sfx.Epic(); Fx.Flash(Color.Gold, 0.28f); Fx.Shake(8); }
+            else if (it.Rarity == 4) { Sfx.Rare(); Fx.Flash(new Color(150, 90, 220), 0.12f); }
+            else Sfx.Pull();
+
+            _revealTimer += 0.33f;
         }
     }
 
@@ -68,15 +103,18 @@ public class GachaScene(IgraGame game) : Scene(game)
         {
             case "gacha_result":
                 _items.Clear();
+                _ages.Clear();
+                _pending.Clear();
                 foreach (var item in payload.Arr("items").EnumerateArray())
                 {
-                    _items.Add((
+                    _pending.Add((
                         item.Int("rarity"),
                         item.Str("def_id") ?? "?",
                         item.TryGetProperty("is_new", out var n) && n.GetBoolean(),
                         item.Int("converted_to_dust")
                     ));
                 }
+                _revealTimer = 0.2f;
                 _pullsLeft = payload.Int("pulls_left");
                 _dust = payload.Int("dust_balance");
                 var pity = payload.GetProperty("pity_after");
@@ -93,8 +131,11 @@ public class GachaScene(IgraGame game) : Scene(game)
 
             case "collection_state":
                 _items.Clear();
+                _ages.Clear();
+                _pending.Clear();
                 foreach (var o in payload.Arr("owned").EnumerateArray())
                     _items.Add((0, o.Str("def_id") ?? "?", false, 0));
+                for (int i = 0; i < _items.Count; i++) _ages.Add(1f);
                 _dust = payload.Int("dust");
                 _pullsLeft = payload.Int("pulls");
                 _summary = $"Коллекция: {payload.Arr("owned").GetArrayLength()} видов | пыль: {_dust} | круток: {_pullsLeft}";

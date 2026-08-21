@@ -14,14 +14,19 @@ public class IgraGame : Game
     private SpriteBatch _batch = null!;
     private FontSystem _fonts = null!;
     private Texture2D _bgTex = null!;
+    private Texture2D? _whiteTex;
     private MouseState _prevMouse;
+    private KeyboardState _prevKeys;
     private bool _clickConsumed;
 
     public Net.NetClient Net { get; } = new();
-    public Scene? Scene { get; set; }
+    private Scene? _scene;
+    public Scene? Scene { get => _scene; set { _scene = value; _fade = 0f; } }
     public string PlayerId { get; private set; }
     public string StatusLine { get; set; } = "";
     public List<string> Feed { get; } = new(); // последние события для меню
+    public float Dt { get; private set; }
+    private float _fade = 1f; // затемнение при смене сцены (1 → 0)
 
     public IgraGame()
     {
@@ -63,6 +68,7 @@ public class IgraGame : Game
                 (byte)(52 + (22 - 52) * t));
         }
         _bgTex.SetData(px);
+        Art.Init(GraphicsDevice);
         Sfx.Init();
 
         Scene = new ConnectScene(this);
@@ -82,6 +88,14 @@ public class IgraGame : Game
 
     protected override void Update(GameTime gameTime)
     {
+        Dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+        Fx.Update(Dt);
+
+        var keys = Keyboard.GetState();
+        if (keys.IsKeyDown(Keys.M) && !_prevKeys.IsKeyDown(Keys.M))
+            Sfx.ToggleMute();
+        _prevKeys = keys;
+
         while (Net.TryTake(out var msg))
             Scene?.OnMessage(msg.Type, msg.Payload);
 
@@ -93,12 +107,32 @@ public class IgraGame : Game
     {
         _clickConsumed = false;
         GraphicsDevice.Clear(new Color(24, 26, 34));
-        _batch.Begin();
+
+        _fade = MathF.Min(1f, _fade + Dt * 3f);
+        var shake = Fx.ShakeOffset();
+
+        _batch.Begin(transformMatrix: Matrix.CreateTranslation(new Vector3(shake, 0)));
         DrawBackground(_batch);
         Scene?.Draw(_batch, _fonts);
         if (!string.IsNullOrEmpty(StatusLine))
             DrawString(_batch, 16, 700, StatusLine, Color.OrangeRed, 18);
+        Fx.Draw(this, _batch);
         _batch.End();
+
+        if (Fx.FlashAlpha > 0.01f)
+        {
+            _batch.Begin();
+            FillRect(_batch, new Rectangle(0, 0, 1280, 720), Fx.FlashColor * Fx.FlashAlpha);
+            _batch.End();
+        }
+
+        if (_fade < 1f)
+        {
+            _batch.Begin();
+            FillRect(_batch, new Rectangle(0, 0, 1280, 720), Color.Black * (1 - _fade));
+            _batch.End();
+        }
+
         _prevMouse = Mouse.GetState();
         base.Draw(gameTime);
     }
@@ -108,9 +142,26 @@ public class IgraGame : Game
     public void DrawString(SpriteBatch b, float x, float y, string text, Color color, float size = 20f) =>
         b.DrawString(_fonts.GetFont(size), text, new Vector2(x, y), color);
 
-    /// <summary>Рисует растянутый градиент фона.</summary>
-    public void DrawBackground(SpriteBatch b) =>
+    /// <summary>Шрифт заданного размера (для Fx и внешних рисовалок).</summary>
+    public DynamicSpriteFont FontOf(float size) => _fonts.GetFont(size);
+
+    /// <summary>Белый пиксель 1x1 (кэшируется).</summary>
+    public Texture2D White => _whiteTex ??= CreateWhite();
+
+    private Texture2D CreateWhite()
+    {
+        var t = new Texture2D(GraphicsDevice, 1, 1);
+        t.SetData(new[] { Color.White });
+        return t;
+    }
+
+    /// <summary>Рисует фон: картинка из Assets/bg, иначе градиент.</summary>
+    public void DrawBackground(SpriteBatch b)
+    {
+        var art = Art.BattleBg();
+        if (art != null) { b.Draw(art, new Rectangle(0, 0, 1280, 720), Color.White); return; }
         b.Draw(_bgTex, new Rectangle(0, 0, 1280, 720), Color.White);
+    }
 
     /// <summary>Панель с рамкой (карточка/кнопка-контейнер).</summary>
     public void Panel(SpriteBatch b, Rectangle r, Color fill, Color? border = null)
@@ -128,12 +179,8 @@ public class IgraGame : Game
 
     public Vector2 Measure(string text, float size) => _fonts.GetFont(size).MeasureString(text);
 
-    public void FillRect(SpriteBatch b, Rectangle r, Color c)
-    {
-        using var tex = new Texture2D(GraphicsDevice, 1, 1);
-        tex.SetData(new[] { Color.White });
-        b.Draw(tex, r, c);
-    }
+    public void FillRect(SpriteBatch b, Rectangle r, Color c) =>
+        b.Draw(White, r, c);
 
     public static bool Clicked(Rectangle r)
     {

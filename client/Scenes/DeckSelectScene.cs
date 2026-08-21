@@ -29,20 +29,33 @@ public class DeckSelectScene(IgraGame game) : Scene(game)
 
             G.Panel(batch, r, selected ? new Color(40, 60, 90) : new Color(28, 30, 42),
                 selected ? Color.Gold : new Color(60, 64, 84));
-            G.DrawString(batch, r.X + 12, r.Y + 10, c.Name, Color.White, 19);
-            G.DrawString(batch, r.X + 12, r.Y + 36, new string('★', c.Rarity), IgraGame.RarityColors[c.Rarity], 17);
-            G.DrawString(batch, r.X + 190, r.Y + 36, Ru.ElementRu(c.Element), Ru.ElementColor(c.Element), 16);
-            G.DrawString(batch, r.X + 12, r.Y + 60, $"Здоровье: {c.Hp}", Color.LightGreen, 16);
+
+            // портрет (если есть картинка в Assets/chars/{def_id}.png)
+            var portrait = Art.Portrait(c.DefId);
+            int textX = r.X + 12;
+            if (portrait != null)
+            {
+                batch.Draw(portrait, new Rectangle(r.X + cw - 78, r.Y + 10, 66, 66), Color.White);
+                textX = r.X + 12;
+                G.DrawString(batch, r.X + cw - 78, r.Y + 80, Ru.ElementRu(c.Element), Ru.ElementColor(c.Element), 13);
+            }
+
+            G.DrawString(batch, textX, r.Y + 10, c.Name, Color.White, 19);
+            G.DrawString(batch, textX, r.Y + 36, new string('★', c.Rarity), IgraGame.RarityColors[c.Rarity], 17);
+            if (portrait == null)
+                G.DrawString(batch, r.X + 190, r.Y + 36, Ru.ElementRu(c.Element), Ru.ElementColor(c.Element), 16);
+            G.DrawString(batch, textX, r.Y + 60, $"Здоровье: {c.Hp}", Color.LightGreen, 16);
             var lines = Wrap(c.Desc, cw - 24, 15);
             for (int k = 0; k < lines.Count; k++)
-                G.DrawString(batch, r.X + 12, r.Y + 84 + k * 20, lines[k], Color.LightGray, 15);
+                G.DrawString(batch, textX, r.Y + 84 + k * 20, lines[k], Color.LightGray, 15);
             if (selected)
-                G.DrawString(batch, r.X + cw - 34, r.Y + 8, "✓", Color.Gold, 26);
+                G.DrawString(batch, r.X + cw - 34, r.Y + ch - 40, "В ОТРЯДЕ", Color.Gold, 15);
 
             if (G.ClickOnce(r) && (selected || _sel.Count < 3))
             {
                 if (selected) _sel.Remove(c.DefId); else _sel.Add(c.DefId);
                 Sfx.Click();
+                Fx.Burst(new Vector2(r.X + cw / 2, r.Y + ch / 2), Color.Gold, 12, 120);
             }
         }
 

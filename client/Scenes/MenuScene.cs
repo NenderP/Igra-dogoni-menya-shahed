@@ -13,7 +13,8 @@ public class MenuScene(IgraGame game) : Scene(game)
 
     public override void Draw(SpriteBatch batch, FontSystem fonts)
     {
-        G.DrawString(batch, 440, 40, "ИГРА — карточная", Color.Gold, 42);
+        var pulse = 0.5f + 0.5f * (float)Math.Sin(DateTime.Now.TimeOfDay.TotalSeconds * 2);
+        G.DrawString(batch, 440, 40, "ИГРА — карточная", Color.Gold * (0.7f + 0.3f * pulse), 42);
 
         var y = 140f;
         foreach (var line in G.Feed.TakeLast(6))

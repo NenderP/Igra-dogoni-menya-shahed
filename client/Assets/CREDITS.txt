@@ -1,0 +1,11 @@
+Звуки: client/Assets/sfx/*.wav
+Источник: "The Essential Retro Video Game Sound Effects Collection [512 sounds]"
+Автор: Juhani Junkala (SubspaceAudio)
+Лицензия: CC0 (https://opengameart.org/content/512-sound-effects-8-bit-style)
+Переименованы: click/hit/skill/win/lose/pull/rare/epic/death/swap/card
+
+Куда класть своё:
+- Портреты персонажей: Assets/chars/{def_id}.png (например char_day_mage.png), квадратные, лучше 128x128+
+- Фон боя: Assets/bg/battle_bg.png (1280x720)
+- Музыка (заменит встроенный синт-луп): Assets/music/theme.ogg или theme.wav
+Файлы подхватываются автоматически при запуске.
