@@ -13,6 +13,8 @@ public class IgraGame : Game
     private readonly GraphicsDeviceManager _gfx;
     private SpriteBatch _batch = null!;
     private FontSystem _fonts = null!;
+    private MouseState _prevMouse;
+    private bool _clickConsumed;
 
     public Net.NetClient Net { get; } = new();
     public Scene? Scene { get; set; }
@@ -74,12 +76,14 @@ public class IgraGame : Game
 
     protected override void Draw(GameTime gameTime)
     {
+        _clickConsumed = false;
         GraphicsDevice.Clear(new Color(24, 26, 34));
         _batch.Begin();
         Scene?.Draw(_batch, _fonts);
         if (!string.IsNullOrEmpty(StatusLine))
             DrawString(_batch, 16, 700, StatusLine, Color.OrangeRed, 18);
         _batch.End();
+        _prevMouse = Mouse.GetState();
         base.Draw(gameTime);
     }
 
@@ -103,14 +107,29 @@ public class IgraGame : Game
         return m.LeftButton == ButtonState.Pressed && r.Contains(m.Position);
     }
 
-    /// <summary>Кнопка: рисует и возвращает true, если по ней кликнули.</summary>
+    /// <summary>Клик засчитывается один раз (на нажатии), а не каждый кадр удержания.</summary>
+    public bool ClickOnce(Rectangle r)
+    {
+        var m = Mouse.GetState();
+        bool down = m.LeftButton == ButtonState.Pressed && r.Contains(m.Position);
+        bool wasUp = _prevMouse.LeftButton == ButtonState.Released;
+        if (down && wasUp && !_clickConsumed)
+        {
+            _clickConsumed = true;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>Кнопка: рисует и возвращает true, если по ней кликнули (один раз).</summary>
     public bool Button(SpriteBatch b, Rectangle r, string label, Color? color = null, float fontSize = 22f)
     {
-        var hovered = r.Contains(Mouse.GetState().Position);
+        var m = Mouse.GetState();
+        var hovered = r.Contains(m.Position);
         FillRect(b, r, color ?? (hovered ? new Color(70, 90, 130) : new Color(50, 62, 92)));
         var size = Measure(label, fontSize);
         DrawString(b, r.X + (r.Width - size.X) / 2, r.Y + (r.Height - size.Y) / 2, label, Color.White, fontSize);
-        return Clicked(r);
+        return ClickOnce(r);
     }
 
     public static readonly Color[] RarityColors =

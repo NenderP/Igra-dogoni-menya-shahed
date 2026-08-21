@@ -11,6 +11,7 @@ public class PlayerCollection
 
     // Валюта/пыль
     public int Dust { get; set; } = 0;
+    public int Pulls { get; set; } = 100; // стартовые бесплатные крутки; пополняются пылью
     public int Currency { get; set; } = 0; // премиум-валюта для круток (если нужна)
 
     // Пити (protocol: pity.pulls_since_5star, guaranteed_featured)
@@ -34,10 +35,10 @@ public class PlayerCollection
     {
         var list = new List<OwnedEntry>();
         foreach (var kv in Owned) list.Add(new OwnedEntry(kv.Key, kv.Value));
-        return new CollectionState(list, Dust, new PityState(PullsSince5Star, GuaranteedFeatured));
+        return new CollectionState(list, Dust, Pulls, new PityState(PullsSince5Star, GuaranteedFeatured));
     }
 }
 
 public record OwnedEntry(string DefId, int Copies);
 public record PityState(int PullsSince5Star, bool GuaranteedFeatured);
-public record CollectionState(List<OwnedEntry> Owned, int Dust, PityState Pity);
+public record CollectionState(List<OwnedEntry> Owned, int Dust, int Pulls, PityState Pity);

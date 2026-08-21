@@ -7,35 +7,59 @@ using System.Text.Json;
 
 namespace Igra.Client.Scenes;
 
-/// <summary>Экран гачи: крутки, результаты с цветами редкости, коллекция.</summary>
+/// <summary>Экран гачи: крутки, результаты с цветами редкости, коллекция, крафт пылью.</summary>
 public class GachaScene(IgraGame game) : Scene(game)
 {
-    private readonly List<string> _lines = new();
+    private readonly List<(int Rarity, string DefId, bool IsNew, int Dust)> _items = new();
     private string _summary = "";
+    private bool _inited;
+    private int _pullsLeft;
+    private int _dust;
 
     public override void Draw(SpriteBatch batch, FontSystem fonts)
     {
-        G.DrawString(batch, 520, 30, "ГАЧА", Color.Gold, 40);
+        if (!_inited) { _inited = true; Send("collection_sync", new { }); }
 
-        if (G.Button(batch, new Rectangle(420, 110, 200, 54), "Крутить ×1"))
-            Send("gacha_pull", new { count = 1 });
-        if (G.Button(batch, new Rectangle(660, 110, 200, 54), "Крутить ×10"))
-            Send("gacha_pull", new { count = 10 });
-        if (G.Button(batch, new Rectangle(540, 174, 200, 44), "Коллекция"))
-            Send("collection_sync", new { });
+        G.DrawString(batch, 520, 30, "ГАЧА", Color.Gold, 40);
+        G.DrawString(batch, 20, 36, $"Круток: {_pullsLeft}   Пыль: {_dust}", Color.LightGray, 20);
+
+        if (G.Button(batch, new Rectangle(380, 110, 200, 54), "Крутить ×1"))
+            TryPull(1);
+        if (G.Button(batch, new Rectangle(600, 110, 200, 54), "Крутить ×10"))
+            TryPull(10);
+        if (G.Button(batch, new Rectangle(380, 176, 200, 40), "Крафт ×1 (60 пыли)"))
+            Send("dust_to_pulls", new { pulls = 1 });
+        if (G.Button(batch, new Rectangle(600, 176, 200, 40), "Крафт ×10 (600)"))
+            Send("dust_to_pulls", new { pulls = 10 });
         if (G.Button(batch, new Rectangle(20, 20, 120, 44), "← Меню"))
             G.Scene = new MenuScene(G);
 
         if (_summary.Length > 0)
-            G.DrawString(batch, 60, 240, _summary, Color.Yellow, 20);
+            G.DrawString(batch, 60, 232, _summary, Color.YellowGreen, 19);
 
-        var y = 280f;
-        foreach (var line in _lines.TakeLast(14))
+        // карточки результата
+        int cardW = 150, cardH = 70, x0 = 60, y0 = 280, gap = 12;
+        for (int i = 0; i < _items.Count; i++)
         {
-            var rarity = line.Contains("5★") ? 5 : line.Contains("4★") ? 4 : 3;
-            G.DrawString(batch, 60, y, line, IgraGame.RarityColors[rarity], 19);
-            y += 26;
+            var it = _items[i];
+            int col = i % 7, row = i / 7;
+            var r = new Rectangle(x0 + col * (cardW + gap), y0 + row * (cardH + gap), cardW, cardH);
+            G.FillRect(batch, r, IgraGame.RarityColors[it.Rarity]);
+            G.DrawString(batch, r.X + 8, r.Y + 8, new string('★', it.Rarity), Color.White, 18);
+            G.DrawString(batch, r.X + 8, r.Y + 34, it.DefId.Replace("char_", ""), Color.White, 16);
+            G.DrawString(batch, r.X + 8, r.Y + 52,
+                it.IsNew ? "НОВЫЙ!" : $"+{it.Dust} пыли", it.IsNew ? Color.White : Color.LightGray, 16);
         }
+    }
+
+    private void TryPull(int count)
+    {
+        if (_pullsLeft < (count == 10 ? 10 : 1) && _pullsLeft < 1)
+        {
+            _summary = "Нет круток — скрафти пылью (60 пыли = 1)";
+            return;
+        }
+        Send("gacha_pull", new { count });
     }
 
     public override void OnMessage(string type, JsonElement payload)
@@ -43,26 +67,41 @@ public class GachaScene(IgraGame game) : Scene(game)
         switch (type)
         {
             case "gacha_result":
-                _lines.Clear();
+                _items.Clear();
                 foreach (var item in payload.Arr("items").EnumerateArray())
                 {
-                    var defId = item.Str("def_id") ?? "?";
-                    var rarity = item.Int("rarity");
-                    var isNew = item.TryGetProperty("is_new", out var n) && n.GetBoolean();
-                    var dust = item.Int("converted_to_dust");
-                    var stars = new string('★', rarity);
-                    _lines.Add($"{stars} {defId.Replace("char_", "")}{(isNew ? " — НОВЫЙ!" : $" → +{dust} пыли")}");
+                    _items.Add((
+                        item.Int("rarity"),
+                        item.Str("def_id") ?? "?",
+                        item.TryGetProperty("is_new", out var n) && n.GetBoolean(),
+                        item.Int("converted_to_dust")
+                    ));
                 }
+                _pullsLeft = payload.Int("pulls_left");
+                _dust = payload.Int("dust_balance");
                 var pity = payload.GetProperty("pity_after");
-                _summary = $"Пыль: {payload.Int("dust_balance")} | до гарант-5★: {pity.Int("pulls_since_5star")}/90" +
-                           (pity.TryGetProperty("guaranteed_featured", out var g) && g.GetBoolean() ? " (гарант фичера!)" : "");
+                int since = pity.Int("pulls_since_5star");
+                bool feat = pity.TryGetProperty("guaranteed_featured", out var g) && g.GetBoolean();
+                _summary = $"Пыль: {_dust} | круток: {_pullsLeft} | до гарант-5★: {since}/90" + (feat ? " (гарант фичера!)" : "");
+                break;
+
+            case "dust_exchanged":
+                _dust = payload.Int("dust_balance");
+                _pullsLeft = payload.Int("pulls_left");
+                _summary = $"Сделано круток: {payload.Int("pulls_granted")}. Теперь круток: {_pullsLeft}";
                 break;
 
             case "collection_state":
-                _lines.Clear();
+                _items.Clear();
                 foreach (var o in payload.Arr("owned").EnumerateArray())
-                    _lines.Add($"{o.Str("def_id")}×{o.Int("copies")}");
-                _summary = $"Всего видов: {payload.Arr("owned").GetArrayLength()}, пыль: {payload.Int("dust")}";
+                    _items.Add((0, o.Str("def_id") ?? "?", false, 0));
+                _dust = payload.Int("dust");
+                _pullsLeft = payload.Int("pulls");
+                _summary = $"Коллекция: {payload.Arr("owned").GetArrayLength()} видов | пыль: {_dust} | круток: {_pullsLeft}";
+                break;
+
+            case "error":
+                _summary = "Ошибка: " + (payload.Str("message") ?? payload.Str("code") ?? "?");
                 break;
         }
     }

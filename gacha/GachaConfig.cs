@@ -37,4 +37,6 @@ public static class GachaConfig
     // Награды за бой (заглушка, генерирует сервер боя, зачисляет гача-модуль)
     public const int RewardDustWin = 15;
     public const int RewardDustLose = 5;
+    public const int RewardPullsWin = 3;
+    public const int RewardPullsLose = 1;
 }

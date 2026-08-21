@@ -49,8 +49,13 @@ public class BattleScene(IgraGame game) : Scene(game)
 
     public override void Draw(SpriteBatch batch, FontSystem fonts)
     {
+        var target = _selectedFoeUid == null ? null : _view.FoeChars.FirstOrDefault(c => c.Uid == _selectedFoeUid);
         G.DrawString(batch, 20, 12, $"Раунд {_view.Round}", Color.White, 26);
         G.DrawString(batch, 1080, 12, $"Перебросы: {_view.RerollsLeft}", Color.Gray, 18);
+        if (target != null)
+            G.DrawString(batch, 360, 14, $"Цель: {target.ShortName}", Color.OrangeRed, 18);
+        else
+            G.DrawString(batch, 360, 14, "Кликни врага, чтобы выбрать цель", Color.Gray, 16);
 
         DrawSide(batch, _view.FoeChars, y: 60, isEnemy: true);
         DrawSide(batch, _view.MyChars, y: 330, isEnemy: false);
@@ -72,8 +77,10 @@ public class BattleScene(IgraGame game) : Scene(game)
         for (int i = 0; i < _view.MyHand.Count; i++)
         {
             var r = new Rectangle(30 + i * 130, 580, 120, 44);
-            G.Button(batch, r, ShortCard(_view.MyHand[i]), new Color(60, 80, 60), 15);
-            if (IgraGame.Clicked(r)) Send("play_card", new { card_def_id = _view.MyHand[i] });
+            var hov = r.Contains(Microsoft.Xna.Framework.Input.Mouse.GetState().Position);
+            G.FillRect(batch, r, hov ? new Color(80, 110, 80) : new Color(60, 80, 60));
+            G.DrawString(batch, r.X + 6, r.Y + 12, ShortCard(_view.MyHand[i]), Color.White, 15);
+            if (G.ClickOnce(r)) Send("play_card", new { card_def_id = _view.MyHand[i] });
         }
 
         // кнопки действий
@@ -92,27 +99,41 @@ public class BattleScene(IgraGame game) : Scene(game)
             var c = chars[i];
             var r = new Rectangle(340 + i * 210, y, 195, 150);
             bool selected = c.Uid == _selectedFoeUid && isEnemy;
+            bool isActive = !isEnemy && c.Uid == _view.MyActiveUid;
             G.FillRect(batch, r, !c.Alive ? new Color(45, 45, 45)
-                : selected ? new Color(90, 60, 40)
+                : selected ? new Color(110, 75, 45)
                 : isEnemy ? new Color(80, 50, 55) : new Color(45, 65, 85));
 
+            // рамка активного
+            if (isActive && c.Alive)
+            {
+                var bcol = isEnemy ? Color.OrangeRed : Color.Gold;
+                G.FillRect(batch, new Rectangle(r.X, r.Y, r.Width, 4), bcol);
+                G.FillRect(batch, new Rectangle(r.X, r.Y + r.Height - 4, r.Width, 4), bcol);
+            }
+
             G.DrawString(batch, r.X + 10, r.Y + 8, c.ShortName, Color.White, 18);
-            G.DrawString(batch, r.X + 10, r.Y + 36, $"{c.Hp}/{c.MaxHp} HP" + (c.Shield > 0 ? $" (+{c.Shield})" : ""),
-                c.Hp <= c.MaxHp / 3 ? Color.OrangeRed : Color.LightGreen, 20);
-            G.DrawString(batch, r.X + 10, r.Y + 64, $"Энергия {c.Energy}/{c.EnergyMax}",
-                c.Energy >= c.EnergyMax ? Color.Gold : Color.Silver, 17);
-            G.DrawString(batch, r.X + 10, r.Y + 92, c.Element, ElementColor(c.Element), 17);
+            // HP-бар
+            int bw = 175, bh = 14;
+            G.FillRect(batch, new Rectangle(r.X + 10, r.Y + 34, bw, bh), new Color(40, 20, 20));
+            float hpFrac = c.MaxHp > 0 ? (float)c.Hp / c.MaxHp : 0;
+            var hpCol = c.Hp <= c.MaxHp / 3 ? Color.OrangeRed : c.Hp <= c.MaxHp * 2 / 3 ? Color.Gold : Color.LightGreen;
+            G.FillRect(batch, new Rectangle(r.X + 10, r.Y + 34, (int)(bw * hpFrac), bh), hpCol);
+            G.DrawString(batch, r.X + 10, r.Y + 34, $"{c.Hp}/{c.MaxHp}" + (c.Shield > 0 ? $" (+{c.Shield})" : ""),
+                Color.White, 13);
+            G.DrawString(batch, r.X + 10, r.Y + 60, $"Энергия {c.Energy}/{c.EnergyMax}",
+                c.Energy >= c.EnergyMax ? Color.Gold : Color.Silver, 16);
+            G.DrawString(batch, r.X + 10, r.Y + 84, c.Element, ElementColor(c.Element), 16);
             if (!c.Alive) G.DrawString(batch, r.X + 55, r.Y + 55, "ПАЛ", Color.Red, 30);
 
-            if (isEnemy && c.Alive && IgraGame.Clicked(r))
+            if (isEnemy && c.Alive && G.ClickOnce(r))
                 _selectedFoeUid = c.Uid;
         }
     }
 
     private void DoSkill()
     {
-        var me = _view.MyChars.FirstOrDefault(c => c.Uid == _view.MyActiveUid);
-        if (me == null || me.Energy < 1 && !_view.MyDice.Any()) return;
+        if (_view.MyActiveUid.Length == 0) return;
         Send("use_skill", new { character_uid = _view.MyActiveUid, target_uid = _selectedFoeUid ?? "" });
     }
 

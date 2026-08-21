@@ -16,14 +16,16 @@ public class GameSession
     private readonly Random _rng;
     private readonly GachaService _gacha;
     private readonly string? _botPlayerId;
+    private readonly BotDifficulty _botDifficulty = BotDifficulty.Normal;
     private bool _gameOverSent;
 
     public GameSession(string idA, ClientConnection connA, BotDeck deckA,
                        string idB, ClientConnection? connB, BotDeck deckB,
-                       Random rng, GachaService gacha)
+                       Random rng, GachaService gacha, BotDifficulty botDifficulty = BotDifficulty.Normal)
     {
         _rng = rng;
         _gacha = gacha;
+        _botDifficulty = botDifficulty;
         if (connB == null) _botPlayerId = idB;
 
         _engine = new BattleEngine(idA, idB, deckA, deckB, rng);
@@ -117,7 +119,7 @@ public class GameSession
         int guard = 0;
         while (!bot.EndedTurn && State.Phase == Phase.Action && guard++ < 20)
         {
-            var decision = BotBrain.Next(State, bot, _rng);
+            var decision = BotBrain.Next(State, bot, _rng, _botDifficulty);
             if (decision == null) { _engine.EndTurn(bot); break; }
 
             switch (decision.Kind)

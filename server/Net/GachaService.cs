@@ -20,7 +20,15 @@ public class GachaService
     public object Pull(string playerId, int count)
     {
         var acc = Require(playerId);
-        var result = _gacha.Pull(acc.Collection, count);
+        var col = acc.Collection;
+
+        int n = Math.Clamp(count, 1, 10);
+        n = Math.Min(n, col.Pulls);
+        if (n <= 0)
+            throw new InvalidOperationException("Крутки кончились — скрафти пылью (60 пыли = 1 крутка)");
+
+        col.Pulls -= n;
+        var result = _gacha.Pull(col, n);
         return new
         {
             items = result.Items.Select(i => new
@@ -36,7 +44,8 @@ public class GachaService
                 guaranteed_featured = result.PityAfter.GuaranteedFeatured
             },
             dust_balance = result.DustBalance,
-            currency_spent = 0 // v0: крутки пока бесплатные, валюту введём с клиентом
+            pulls_left = col.Pulls,
+            currency_spent = 0
         };
     }
 
@@ -47,6 +56,7 @@ public class GachaService
         {
             owned = st.Owned.Select(o => new { def_id = o.DefId, copies = o.Copies }),
             dust = st.Dust,
+            pulls = st.Pulls,
             pity = new
             {
                 pulls_since_5star = st.Pity.PullsSince5Star,
@@ -59,13 +69,14 @@ public class GachaService
     {
         var acc = Require(playerId);
         int given = DustSystem.DustToPulls(acc.Collection, pullsRequested);
-        return new { pulls_granted = given, dust_balance = acc.Collection.Dust };
+        return new { pulls_granted = given, dust_balance = acc.Collection.Dust, pulls_left = acc.Collection.Pulls };
     }
 
     /// <summary>Начислить награду за бой (вызывает GameSession при game_over).</summary>
     public void AddBattleRewards(string playerId, bool win) =>
         _progress.AddRewards(playerId, new BattleRewards(
-            win ? GachaConfig.RewardDustWin : GachaConfig.RewardDustLose, 0));
+            win ? GachaConfig.RewardDustWin : GachaConfig.RewardDustLose, 0,
+            win ? GachaConfig.RewardPullsWin : GachaConfig.RewardPullsLose));
 
     private Account Require(string playerId) =>
         _accounts.Get(playerId) ?? throw new InvalidOperationException($"Аккаунт {playerId} не найден");

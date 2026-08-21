@@ -2,9 +2,9 @@ namespace Gacha;
 
 /// <summary>
 /// Награды за бой — генерирует сервер боя, зачисляет гача-модуль
-/// (protocol-v0.md, решение №2). Гача владеет dust/currency, сервер только дергает интерфейс.
+/// (protocol-v0.md, решение №2). Гача владеет dust/currency/pulls, сервер только дергает интерфейс.
 /// </summary>
-public record BattleRewards(int Dust, int Currency);
+public record BattleRewards(int Dust, int Currency, int Pulls = 0);
 
 public interface IPlayerProgressService
 {
@@ -26,6 +26,7 @@ public class InMemoryPlayerProgressService : IPlayerProgressService
 
         acc.Collection.Dust += rewards.Dust;
         acc.Collection.Currency += rewards.Currency;
+        acc.Collection.Pulls += rewards.Pulls;
         return (acc.Collection.Dust, acc.Collection.Currency);
     }
 }

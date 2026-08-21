@@ -51,11 +51,17 @@ static void RunServer()
     async Task CreateBotSession(ClientConnection human, string difficulty)
     {
         var acc = gacha.GetOrCreate(human.PlayerId!, "player");
-        var botDeck = new BotDeckGenerator(rng).GetDeck(BotDifficulty.Normal);
+        var botDiff = difficulty switch
+        {
+            "easy" => BotDifficulty.Easy,
+            "hard" => BotDifficulty.Hard,
+            _ => BotDifficulty.Normal
+        };
+        var botDeck = new BotDeckGenerator(rng).GetDeck(botDiff);
         var session = new GameSession(
             acc.PlayerId, human, DeckFactory.ForPlayer(acc, rng),
             $"bot_{difficulty}", null, botDeck,
-            rng, gacha);
+            rng, gacha, botDiff);
         sessions[acc.PlayerId] = session;
         await session.StartAsync();
         Console.WriteLine($"[match] {acc.PlayerId} vs bot ({difficulty})");
