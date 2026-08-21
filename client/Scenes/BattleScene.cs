@@ -102,11 +102,12 @@ public class BattleScene(IgraGame game) : Scene(game)
 
             if (isActive && c.Alive)
                 G.Panel(batch, new Rectangle(r.X - 2, r.Y - 2, r.Width + 4, r.Height + 4), Color.Transparent,
-                    new Color(255, 215, 0, (byte)(120 + 100 * pulse)));
+                    new Color((byte)255, (byte)215, (byte)0, (byte)(120 + 100 * pulse)));
 
             G.DrawString(batch, r.X + 10, r.Y + 8, Ru.Name(c.DefId), Color.White, 18);
             G.DrawString(batch, r.X + 10, r.Y + 32, Ru.ElementRu(c.Element), ElColor(c.Element), 15);
-            G.DrawString(batch, r.X + 120, r.Y + 32, new string('★', c.Rarity < 3 ? 3 : c.Rarity), IgraGame.RarityColors[c.Rarity < 3 ? 3 : c.Rarity], 14);
+            int rar = Ru.Info(c.DefId)?.Rarity ?? 3;
+            G.DrawString(batch, r.X + 120, r.Y + 32, new string('★', rar), IgraGame.RarityColors[rar], 14);
 
             // анимированный HP-бар
             int bw = 175, bh = 16, bx = r.X + 10, byy = r.Y + 56;

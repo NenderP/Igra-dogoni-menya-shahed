@@ -39,7 +39,11 @@ public static class Autotest
             {
                 case "welcome":
                     Console.WriteLine($"OK welcome: dust={p.Int("dust")}");
-                    _ = net.SendAsync("vs_bot", new { difficulty = "easy" });
+                    _ = net.SendAsync("vs_bot", new
+                    {
+                        difficulty = "easy",
+                        characters = new[] { "char_eclipse_sovereign", "char_day_mage", "char_day_squire" }
+                    });
                     break;
                 case "match_found":
                     Console.WriteLine($"OK match_found: режим={p.Str("mode")}");

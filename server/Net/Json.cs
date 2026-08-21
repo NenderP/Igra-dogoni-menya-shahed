@@ -41,4 +41,13 @@ public static class Json
     public static int[] IntArray(this JsonElement e, string name) =>
         e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Array
             ? v.EnumerateArray().Select(x => x.GetInt32()).ToArray() : Array.Empty<int>();
+
+    /// <summary>Достать массив из payload; если поля нет — пустой массив.</summary>
+    public static JsonElement Arr(this JsonElement e, string name) =>
+        e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Array
+            ? v : JsonSerializer.SerializeToElement(Array.Empty<object>());
+
+    public static bool Bool(this JsonElement e, string name, bool fallback = false) =>
+        e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var v) && (v.ValueKind == JsonValueKind.True || v.ValueKind == JsonValueKind.False)
+            ? v.GetBoolean() : fallback;
 }
