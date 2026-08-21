@@ -237,11 +237,14 @@ public class GameSession
         string winner = State.WinnerId!;
         foreach (var playerId in _sides.Keys)
         {
+            if (playerId == _botPlayerId) continue; // боту аккаунта нет — награды не начисляем
+
             bool win = playerId == winner;
             _gacha.AddBattleRewards(playerId, win);
             await SendTo(playerId, "game_over", new
             {
                 winner = win ? "you" : "opponent",
+                round = State.Round,
                 rewards = new { dust = win ? GachaConfig.RewardDustWin : GachaConfig.RewardDustLose, currency = 0 }
             });
         }

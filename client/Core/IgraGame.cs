@@ -1,0 +1,159 @@
+using FontStashSharp;
+using Igra.Client.Scenes;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
+using System.Text.Json;
+
+namespace Igra.Client.Core;
+
+/// <summary>Главная игра: окно, шрифты, сеть, переключение сцен.</summary>
+public class IgraGame : Game
+{
+    private readonly GraphicsDeviceManager _gfx;
+    private SpriteBatch _batch = null!;
+    private FontSystem _fonts = null!;
+
+    public Net.NetClient Net { get; } = new();
+    public Scene? Scene { get; set; }
+    public string PlayerId { get; private set; }
+    public string StatusLine { get; set; } = "";
+    public List<string> Feed { get; } = new(); // последние события для меню
+
+    public IgraGame()
+    {
+        _gfx = new GraphicsDeviceManager(this)
+        {
+            PreferredBackBufferWidth = 1280,
+            PreferredBackBufferHeight = 720
+        };
+        Window.Title = "Igra — карточная";
+        Content.RootDirectory = "Content";
+        IsMouseVisible = true;
+
+        PlayerId = LoadOrCreatePlayerId();
+    }
+
+    protected override void Initialize()
+    {
+        base.Initialize();
+    }
+
+    protected override void LoadContent()
+    {
+        _batch = new SpriteBatch(GraphicsDevice);
+        _fonts = new FontSystem();
+        foreach (var path in FontCandidates.Where(File.Exists))
+        {
+            try { _fonts.AddFont(File.ReadAllBytes(path)); break; } catch { /* следующий */ }
+        }
+
+        Scene = new ConnectScene(this);
+        var _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Net.ConnectAsync();
+                await Net.SendAsync("hello", new { player_id = PlayerId, display_name = "player" });
+            }
+            catch (Exception ex)
+            {
+                StatusLine = "Сервер недоступен: " + ex.Message;
+            }
+        });
+    }
+
+    protected override void Update(GameTime gameTime)
+    {
+        while (Net.TryTake(out var msg))
+            Scene?.OnMessage(msg.Type, msg.Payload);
+
+        Scene?.Update();
+        base.Update(gameTime);
+    }
+
+    protected override void Draw(GameTime gameTime)
+    {
+        GraphicsDevice.Clear(new Color(24, 26, 34));
+        _batch.Begin();
+        Scene?.Draw(_batch, _fonts);
+        if (!string.IsNullOrEmpty(StatusLine))
+            DrawString(_batch, 16, 700, StatusLine, Color.OrangeRed, 18);
+        _batch.End();
+        base.Draw(gameTime);
+    }
+
+    // ---------- Хелперы рисования/ввода ----------
+
+    public void DrawString(SpriteBatch b, float x, float y, string text, Color color, float size = 20f) =>
+        b.DrawString(_fonts.GetFont(size), text, new Vector2(x, y), color);
+
+    public Vector2 Measure(string text, float size) => _fonts.GetFont(size).MeasureString(text);
+
+    public void FillRect(SpriteBatch b, Rectangle r, Color c)
+    {
+        using var tex = new Texture2D(GraphicsDevice, 1, 1);
+        tex.SetData(new[] { Color.White });
+        b.Draw(tex, r, c);
+    }
+
+    public static bool Clicked(Rectangle r)
+    {
+        var m = Mouse.GetState();
+        return m.LeftButton == ButtonState.Pressed && r.Contains(m.Position);
+    }
+
+    /// <summary>Кнопка: рисует и возвращает true, если по ней кликнули.</summary>
+    public bool Button(SpriteBatch b, Rectangle r, string label, Color? color = null, float fontSize = 22f)
+    {
+        var hovered = r.Contains(Mouse.GetState().Position);
+        FillRect(b, r, color ?? (hovered ? new Color(70, 90, 130) : new Color(50, 62, 92)));
+        var size = Measure(label, fontSize);
+        DrawString(b, r.X + (r.Width - size.X) / 2, r.Y + (r.Height - size.Y) / 2, label, Color.White, fontSize);
+        return Clicked(r);
+    }
+
+    public static readonly Color[] RarityColors =
+    {
+        new(120, 120, 120), new(120, 120, 120), new(120, 120, 120), // 0-2
+        new(140, 160, 170),                                          // 3★ серый
+        new(150, 90, 200),                                           // 4★ фиолетовый
+        new(220, 170, 40)                                            // 5★ золото
+    };
+
+    // ---------- player_id между запусками ----------
+
+    private static string LoadOrCreatePlayerId()
+    {
+        try
+        {
+            var path = Path.Combine(AppContext.BaseDirectory, "igra_player.txt");
+            if (File.Exists(path)) return File.ReadAllText(path).Trim();
+            var id = Guid.NewGuid().ToString("N")[..12];
+            File.WriteAllText(path, id);
+            return id;
+        }
+        catch
+        {
+            return Guid.NewGuid().ToString("N")[..12];
+        }
+    }
+
+    private static readonly string[] FontCandidates =
+    {
+        "C:\\Windows\\Fonts\\segoeui.ttf",
+        "C:\\Windows\\Fonts\\arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/System/Library/Fonts/Helvetica.ttc"
+    };
+}
+
+/// <summary>Базовая сцена.</summary>
+public abstract class Scene(IgraGame game)
+{
+    protected readonly IgraGame G = game;
+
+    public virtual void Update() { }
+    public abstract void Draw(SpriteBatch batch, FontSystem fonts);
+    public virtual void OnMessage(string type, JsonElement payload) { }
+}
