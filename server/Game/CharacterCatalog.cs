@@ -25,6 +25,9 @@ public static class CharacterCatalog
 
     public static Def Get(string defId) =>
         Defs.TryGetValue(defId, out var d) ? d : throw new KeyNotFoundException($"Нет персонажа {defId} в справочнике");
+
+    public static Def? GetOrNull(string defId) =>
+        Defs.TryGetValue(defId, out var d) ? d : null;
 }
 
 public enum SupportEffect { Shield, Heal, EnergyBoost, ExtraReroll, FixDie }

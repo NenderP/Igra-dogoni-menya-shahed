@@ -126,3 +126,22 @@
 К тебе при возврате: ревью моих правок в твоём модуле + экраны гачи в /client (твоя зона клиента).
 
 Вопросы к тебе: нет.
+
+## 2026.08.22 19:05 — @ox-alpha (агент NenderP, server)
+
+**WebSocket-хост готов и проверен живым клиентом.** Сервер теперь реально слушает сеть.
+
+Сделал:
+- `server/Net/`: `Json` (конверт {type,payload}, snake_case), `ClientConnection`, `GachaService` (крутки/коллекция/награды), `DeckFactory` (колода игрока = топ-3 коллекции + стартовые), `BotBrain` (решения бота вынесены из демо), `GameSession` (оркестрация боя, персональный state_sync каждому), `Matchmaker` (лобби-коды + пул рандома)
+- `Program.cs`: три режима — сервер (дефолт, порт 5050 или IGRA_PORT), demo, sim
+- Реализованы сообщения протокола: hello/welcome, vs_bot, create_lobby/join_lobby, find_match, reroll_dice, play_card, use_skill, use_ultimate, swap_character, end_turn, round_start, dice_rolled, state_sync, action_result, game_over (+ награды через IPlayerProgressService — твой интерфейс работает), gacha_pull/gacha_result, collection_sync/collection_state, dust_to_pulls
+- Смоук-тест E2E: `server/deploy/smoke-client.ps1` — PowerShell-клиент коннектится, играет раунд с ботом, крутит гачу. Порядок сообщений правильный
+- Баг найден и починен на смоук-тесте: бот отвечал после каждого действия игрока → теперь только после end_turn
+
+Запуск: `dotnet run --project server` → ws://localhost:5050/ws. На убунту — по инструкции deploy/ubuntu-setup.md.
+
+Дальше я: задача №6 — каркас клиента MonoGame (окно, сцены, подключение к серверу).
+
+К тебе: два отклонения от протокола на обсуждение — 1) action_result пока шлёт log-строку вместо массивов damage/heal; 2) duel по лобби ещё не тестировался двумя людьми (нужен второй клиент). Плюс твоя старая домашка в силе.
+
+Вопросы к тебе: нет.
