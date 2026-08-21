@@ -46,7 +46,7 @@ public class GachaScene(IgraGame game) : Scene(game)
             var r = new Rectangle(x0 + col * (cardW + gap), y0 + row * (cardH + gap), cardW, cardH);
             G.FillRect(batch, r, IgraGame.RarityColors[it.Rarity]);
             G.DrawString(batch, r.X + 8, r.Y + 8, new string('★', it.Rarity), Color.White, 18);
-            G.DrawString(batch, r.X + 8, r.Y + 34, it.DefId.Replace("char_", ""), Color.White, 16);
+            G.DrawString(batch, r.X + 8, r.Y + 34, Ru.Name(it.DefId), Color.White, 16);
             G.DrawString(batch, r.X + 8, r.Y + 52,
                 it.IsNew ? "НОВЫЙ!" : $"+{it.Dust} пыли", it.IsNew ? Color.White : Color.LightGray, 16);
         }

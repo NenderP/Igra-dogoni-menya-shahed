@@ -22,6 +22,9 @@ public class MenuScene(IgraGame game) : Scene(game)
             y += 26;
         }
 
+        if (G.Button(batch, new Rectangle(490, 200, 300, 54), "Собрать отряд", new Color(60, 70, 120)))
+            G.Scene = new DeckSelectScene(G);
+
         if (G.Button(batch, new Rectangle(490, 260, 300, 54), "Бой с лёгким ботом"))
             Send("vs_bot", new { difficulty = "easy" });
         if (G.Button(batch, new Rectangle(490, 324, 300, 54), "Бой с обычным ботом"))

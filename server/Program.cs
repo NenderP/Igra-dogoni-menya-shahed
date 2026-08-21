@@ -48,7 +48,7 @@ static void RunServer()
         Console.WriteLine($"[match] {accA.PlayerId} vs {accB.PlayerId}");
     }
 
-    async Task CreateBotSession(ClientConnection human, string difficulty)
+    async Task CreateBotSession(ClientConnection human, string difficulty, IReadOnlyList<string>? characters = null)
     {
         var acc = gacha.GetOrCreate(human.PlayerId!, "player");
         var botDiff = difficulty switch
@@ -58,8 +58,11 @@ static void RunServer()
             _ => BotDifficulty.Normal
         };
         var botDeck = new BotDeckGenerator(rng).GetDeck(botDiff);
+        var playerDeck = characters != null
+            ? DeckFactory.FromDefIds(characters)
+            : DeckFactory.ForPlayer(acc, rng);
         var session = new GameSession(
-            acc.PlayerId, human, DeckFactory.ForPlayer(acc, rng),
+            acc.PlayerId, human, playerDeck,
             $"bot_{difficulty}", null, botDeck,
             rng, gacha, botDiff);
         sessions[acc.PlayerId] = session;
@@ -117,7 +120,9 @@ static void RunServer()
                     }
                     case "vs_bot":
                         if (conn.PlayerId == null) goto auth;
-                        await CreateBotSession(conn, payload.Str("difficulty") ?? "normal");
+                        var chars = payload.Arr("characters").EnumerateArray().Select(x => x.GetString() ?? "").ToList();
+                        await CreateBotSession(conn, payload.Str("difficulty") ?? "normal",
+                            chars.Count == 3 ? chars : null);
                         break;
                     case "create_lobby":
                         if (conn.PlayerId == null) goto auth;

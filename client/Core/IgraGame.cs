@@ -13,6 +13,7 @@ public class IgraGame : Game
     private readonly GraphicsDeviceManager _gfx;
     private SpriteBatch _batch = null!;
     private FontSystem _fonts = null!;
+    private Texture2D _bgTex = null!;
     private MouseState _prevMouse;
     private bool _clickConsumed;
 
@@ -50,6 +51,20 @@ public class IgraGame : Game
             try { _fonts.AddFont(File.ReadAllBytes(path)); break; } catch { /* следующий */ }
         }
 
+        // вертикальный градиент фона (1x256, растягивается)
+        _bgTex = new Texture2D(GraphicsDevice, 1, 256);
+        var px = new Color[256];
+        for (int y = 0; y < 256; y++)
+        {
+            float t = y / 255f;
+            px[y] = new Color(
+                (byte)(30 + (12 - 30) * t),
+                (byte)(34 + (14 - 34) * t),
+                (byte)(52 + (22 - 52) * t));
+        }
+        _bgTex.SetData(px);
+        Sfx.Init();
+
         Scene = new ConnectScene(this);
         var _ = Task.Run(async () =>
         {
@@ -79,6 +94,7 @@ public class IgraGame : Game
         _clickConsumed = false;
         GraphicsDevice.Clear(new Color(24, 26, 34));
         _batch.Begin();
+        DrawBackground(_batch);
         Scene?.Draw(_batch, _fonts);
         if (!string.IsNullOrEmpty(StatusLine))
             DrawString(_batch, 16, 700, StatusLine, Color.OrangeRed, 18);
@@ -91,6 +107,24 @@ public class IgraGame : Game
 
     public void DrawString(SpriteBatch b, float x, float y, string text, Color color, float size = 20f) =>
         b.DrawString(_fonts.GetFont(size), text, new Vector2(x, y), color);
+
+    /// <summary>Рисует растянутый градиент фона.</summary>
+    public void DrawBackground(SpriteBatch b) =>
+        b.Draw(_bgTex, new Rectangle(0, 0, 1280, 720), Color.White);
+
+    /// <summary>Панель с рамкой (карточка/кнопка-контейнер).</summary>
+    public void Panel(SpriteBatch b, Rectangle r, Color fill, Color? border = null)
+    {
+        FillRect(b, r, fill);
+        if (border != null)
+        {
+            int t = 2;
+            FillRect(b, new Rectangle(r.X, r.Y, r.Width, t), border.Value);
+            FillRect(b, new Rectangle(r.X, r.Y + r.Height - t, r.Width, t), border.Value);
+            FillRect(b, new Rectangle(r.X, r.Y, t, r.Height), border.Value);
+            FillRect(b, new Rectangle(r.X + r.Width - t, r.Y, t, r.Height), border.Value);
+        }
+    }
 
     public Vector2 Measure(string text, float size) => _fonts.GetFont(size).MeasureString(text);
 
@@ -129,7 +163,8 @@ public class IgraGame : Game
         FillRect(b, r, color ?? (hovered ? new Color(70, 90, 130) : new Color(50, 62, 92)));
         var size = Measure(label, fontSize);
         DrawString(b, r.X + (r.Width - size.X) / 2, r.Y + (r.Height - size.Y) / 2, label, Color.White, fontSize);
-        return ClickOnce(r);
+        if (ClickOnce(r)) { Sfx.Click(); return true; }
+        return false;
     }
 
     public static readonly Color[] RarityColors =

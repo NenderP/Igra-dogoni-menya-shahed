@@ -31,4 +31,18 @@ public static class DeckFactory
         return new BotDeck(BotDifficulty.Normal, chars.ToArray(),
             StarterSupports.ToArray(), $"player deck: {acc.DisplayName}");
     }
+
+    /// <summary>Колода из явно выбранных 3 персонажей (экран выбора отряда на клиенте).</summary>
+    public static BotDeck FromDefIds(IReadOnlyList<string> ids)
+    {
+        var valid = ids.Where(id => CharacterCatalog.GetOrNull(id) != null).Distinct().Take(3).ToList();
+        while (valid.Count < 3)
+        {
+            var filler = Starters.Concat(Filler4).FirstOrDefault(s => !valid.Contains(s));
+            if (filler == null) break;
+            valid.Add(filler);
+        }
+        return new BotDeck(BotDifficulty.Normal, valid.ToArray(),
+            StarterSupports.ToArray(), "player chosen deck");
+    }
 }
