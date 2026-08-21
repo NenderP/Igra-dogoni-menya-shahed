@@ -70,7 +70,7 @@ public class GachaSystem
         }
 
         var pityAfter = new PityState(col.PullsSince5Star, col.GuaranteedFeatured);
-        return new GachaPullResult(items, pityAfter, col.Dust, currencySpent: 0);
+        return new GachaPullResult(items, pityAfter, col.Dust, CurrencySpent: 0);
     }
 
     /// <summary>Ролл редкости с учётом пити.</summary>
