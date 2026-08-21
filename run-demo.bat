@@ -1,5 +1,5 @@
 @echo off
-rem Демо-бой: бот easy против бота hard, лог в консоль
+rem Demo battle: easy bot vs hard bot, log printed to console.
 cd /d "%~dp0"
-dotnet run --project server
+dotnet run --project server -- demo
 pause
