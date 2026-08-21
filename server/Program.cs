@@ -1,6 +1,17 @@
 using Gacha;
 using Server.Game;
 
+// Режимы запуска:
+//   dotnet run --project server            — демо-бой бот vs бот
+//   dotnet run --project server -- sim     — симуляция гачи 100k круток (отчёт по пити)
+
+if (args.Length > 0 && args[0] == "sim")
+{
+    int pulls = args.Length > 1 && int.TryParse(args[1], out var n) ? n : 100_000;
+    Console.WriteLine(GachaSimulator.Format(GachaSimulator.Run(pulls)));
+    return;
+}
+
 // Демо-прогон: бот easy vs бот hard, случайные легальные действия.
 // Проверка каркаса движка боя (задача №3). Сеть подключим следующим шагом.
 

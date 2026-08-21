@@ -79,26 +79,18 @@ public class GachaSystem
         // Хард-пити 5★ на 90
         if (col.PullsSince5Star + 1 >= GachaConfig.HardPity5Star) return 5;
 
-        // Хард-пити 4★ на 10 (если давно не было 4★+)
-        // Геншин: гарант 4★/выше каждые 10. Делаем так же.
+        // Хард-пити 4★ на 10 (если давно не было 4★+): гарант срабатывает только если не выпал 5★
         bool need4Star = col.PullsSince4Star + 1 >= GachaConfig.HardPity4Star;
 
         double rate5 = Effective5StarRate(col);
-
-        // Если нужен 4★ гарант — 5★ всё равно может выпасть (сначала чек 5★)
         double r = _rng.NextDouble();
         if (r < rate5) return 5;
-        if (need4Star) return 4;
 
-        // Обычный ролл 4★ vs 3★
-        // Нормируем: rate4 / (rate4+rate3) после вычета 5★
-        // Упрощённо: если не 5★, то 4★ с шансом Rate4/(Rate4+Rate3) ≈ 5.1/99.4
-        double rate4Conditional = GachaConfig.Rate4Star / (GachaConfig.Rate4Star + GachaConfig.Rate3Star);
-        // Но r уже < rate5 отсеяли, второй бросок:
-        double r2 = _rng.NextDouble();
-        if (r2 < GachaConfig.Rate4Star / (1 - rate5)) return 4; // корректнее
-        // fallback — простая версия для читаемости:
-        return r2 < rate4Conditional ? 4 : 3;
+        // Условный шанс 4★ при условии "не 5★": Rate4 / (1 - rate5), нормировка на остаток
+        double p4Conditional = GachaConfig.Rate4Star / (1 - rate5);
+        if (need4Star || _rng.NextDouble() < p4Conditional) return 4;
+
+        return 3;
     }
 
     private double Effective5StarRate(PlayerCollection col)
