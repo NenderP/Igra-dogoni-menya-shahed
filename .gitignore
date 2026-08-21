@@ -1,0 +1,24 @@
+# Локальные проекты (не часть этого репозитория)
+/netbreaker/
+/upgrader/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Java / Gradle
+build/
+.gradle/
+
+# C# / MonoGame (на будущее)
+bin/
+obj/
+*.user
+
+# IDE / ОС
+.vs/
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
