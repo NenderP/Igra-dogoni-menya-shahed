@@ -91,7 +91,7 @@ public class BattleScene(IgraGame game) : Scene(game)
     public override void Draw(SpriteBatch batch, FontSystem fonts)
     {
         // ===== верхняя полоса =====
-        G.DrawString(batch, 20, 8, $"Раунд {_view.Round}", Color.White, 24);
+        // номер раунда показан один раз — на плашке-разделителе между командами
         var target = _selectedFoeUid == null ? null : _view.FoeChars.FirstOrDefault(c => c.Uid == _selectedFoeUid);
         G.DrawString(batch, 300, 10, target != null ? $"Цель: {Ru.Name(target.DefId)}"
             : "Кликни врага = выбрать цель", target != null ? Color.OrangeRed : Color.Gray, 17);
