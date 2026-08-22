@@ -7,15 +7,23 @@ using System.Text.Json;
 
 namespace Igra.Client.Scenes;
 
-/// <summary>Боевой экран: враги сверху, мои дайсы/персонажи/рука снизу, кнопки действий. Всё на русском.</summary>
+/// <summary>
+/// Боевой экран в компоновке Genius Invokation TCG:
+/// соперник сверху, мой отряд по центру, дайсы слева-снизу (кликабельны для переброса),
+/// веер карт справа-снизу, колонка действий справа. Иконки стихий — из Assets/icons.
+/// </summary>
 public class BattleScene(IgraGame game) : Scene(game)
 {
     private BattleView _view = new();
     private string? _selectedFoeUid;
     private string _log = "";
     private readonly Dictionary<string, int> _dispHp = new();
+    private readonly HashSet<int> _selDice = new();
 
+    private const int CardW = 170;
     private static Color ElColor(string el) => Ru.ElementColor(el);
+
+    private Texture2D? Orb(string el) => Art.Tex("icons" + System.IO.Path.DirectorySeparatorChar + $"el_{el}.png");
 
     public override void OnMessage(string type, JsonElement payload)
     {
@@ -28,6 +36,7 @@ public class BattleScene(IgraGame game) : Scene(game)
                 foreach (var c in _view.MyChars.Concat(_view.FoeChars))
                     if (!_dispHp.ContainsKey(c.Uid)) _dispHp[c.Uid] = c.Hp;
                 break;
+
             case "action_result":
             {
                 _log = payload.Str("log") ?? "";
@@ -58,9 +67,12 @@ public class BattleScene(IgraGame game) : Scene(game)
                 }
                 break;
             }
+
             case "round_start":
                 _log = $"— Раунд {payload.Int("round")} —";
+                _selDice.Clear();
                 break;
+
             case "game_over":
                 var win = payload.Str("winner") == "you";
                 if (win) { Sfx.Win(); Fx.Flash(Color.Gold, 0.35f); }
@@ -73,76 +85,128 @@ public class BattleScene(IgraGame game) : Scene(game)
 
     public override void Draw(SpriteBatch batch, FontSystem fonts)
     {
+        // ===== верхняя полоса =====
+        G.DrawString(batch, 20, 8, $"Раунд {_view.Round}", Color.White, 24);
         var target = _selectedFoeUid == null ? null : _view.FoeChars.FirstOrDefault(c => c.Uid == _selectedFoeUid);
-        G.DrawString(batch, 20, 10, $"Раунд {_view.Round}", Color.White, 24);
-        G.DrawString(batch, 1080, 10, $"Перебросы: {_view.RerollsLeft}", Color.Gray, 16);
-        G.DrawString(batch, 360, 12, target != null ? $"Цель: {Ru.Name(target.DefId)}"
-            : "Кликни врага, чтобы выбрать цель", target != null ? Color.OrangeRed : Color.Gray, 17);
+        G.DrawString(batch, 300, 10, target != null ? $"Цель: {Ru.Name(target.DefId)}"
+            : "Кликни врага = выбрать цель", target != null ? Color.OrangeRed : Color.Gray, 17);
+        G.DrawString(batch, 1005, 10, $"Рука соперника: {_view.FoeHandCount}", Color.Silver, 16);
+        G.DrawString(batch, 1180, 10, $"Перебросы: {_view.RerollsLeft}", Color.Gray, 16);
 
-        DrawSide(batch, _view.FoeChars, 60, true);
-        DrawSide(batch, _view.MyChars, 340, false);
+        // ===== ряд соперника (верх, по центру) =====
+        DrawSide(batch, _view.FoeChars, y: 48, h: 130, isEnemy: true);
+        // маркер активного соперника
+        var foeAct = _view.FoeChars.FirstOrDefault(c => c.Uid == _view.FoeActiveUid);
+        if (foeAct != null && foeAct.Alive)
+        {
+            var fr = CardRect(foeAct);
+            G.FillRect(batch, new Rectangle(fr.X + fr.Width / 2 - 6, fr.Y - 12, 12, 12), Color.Red);
+        }
 
-        // лог
-        G.Panel(batch, new Rectangle(20, 226, 1240, 52), new Color(20, 22, 32), new Color(60, 64, 84));
-        G.DrawString(batch, 30, 240, _log.Length > 120 ? _log[..120] : _log, Color.LightGoldenrodYellow, 18);
+        // ===== лог =====
+        G.Panel(batch, new Rectangle(20, 186, 1240, 42), new Color(20, 22, 32), new Color(60, 64, 84));
+        G.DrawString(batch, 30, 194, _log.Length > 130 ? _log[..130] : _log, Color.LightGoldenrodYellow, 17);
 
-        // мои дайсы
+        // ===== мой отряд (центр) =====
+        DrawSide(batch, _view.MyChars, y: 240, h: 160, isEnemy: false);
+
+        // ===== дайсы (слева-снизу, сетка 4х2, клик = выбор) =====
+        G.DrawString(batch, 30, 408, "Дайсы", Color.Silver, 15);
         for (int i = 0; i < _view.MyDice.Count; i++)
         {
+            int colI = i % 4, rowI = i / 4;
             var el = _view.MyDice[i];
-            var r = new Rectangle(30 + i * 62, 292, 54, 54);
-            G.Panel(batch, r, ElColor(el), Color.Black);
-            G.DrawString(batch, r.X + 12, r.Y + 18, Ru.ElementShort(el), Color.Black, 18);
+            var r = new Rectangle(30 + colI * 66, 428 + rowI * 66, 58, 58);
+            bool picked = _selDice.Contains(i);
+            var orb = Orb(el);
+            if (orb != null)
+                batch.Draw(orb, r, picked ? Color.White * 1f : Color.White * 0.75f);
+            else
+                G.FillRect(batch, r, ElColor(el) * (picked ? 1f : 0.75f));
+            G.Panel(batch, r, Color.Transparent, picked ? Color.White : new Color(50, 54, 70));
+            G.DrawString(batch, r.X + 16, r.Y + 38, Ru.ElementShort(el), picked ? Color.Black : new Color(20, 20, 26), 14);
+
+            if (G.ClickOnce(r))
+            {
+                if (!picked && _selDice.Count < _view.RerollsLeft * 8) { _selDice.Add(i); Sfx.Click(); }
+                else if (picked) _selDice.Remove(i);
+            }
         }
 
-        // моя рука
+        // кнопка переброса
+        bool canReroll = _view.RerollsLeft > 0 && _selDice.Count > 0;
+        if (G.Button(batch, new Rectangle(30, 566, 256, 44),
+                canReroll ? $"Перебросить ({_selDice.Count})" : "Переброс не доступен",
+                canReroll ? new Color(80, 90, 140) : new Color(60, 60, 70), 18))
+        {
+            Send("reroll_dice", new { indexes = _selDice.ToArray() });
+            _selDice.Clear();
+        }
+
+        // ===== веер руки (справа-снизу) =====
         for (int i = 0; i < _view.MyHand.Count; i++)
         {
-            var r = new Rectangle(30 + i * 130, 356, 120, 44);
+            var r = new Rectangle(745 + i * 56, 556, 112, 150);
             var hov = r.Contains(Microsoft.Xna.Framework.Input.Mouse.GetState().Position);
-            G.Panel(batch, r, hov ? new Color(80, 110, 80) : new Color(60, 80, 60), new Color(110, 140, 110));
-            G.DrawString(batch, r.X + 6, r.Y + 12, Ru.SupportRu(_view.MyHand[i]), Color.White, 15);
-            if (G.ClickOnce(r)) Send("play_card", new { card_def_id = _view.MyHand[i] });
+            G.Panel(batch, r, hov ? new Color(78, 104, 78) : new Color(58, 76, 58),
+                hov ? new Color(150, 190, 150) : new Color(105, 130, 105));
+            G.DrawString(batch, r.X + 8, r.Y + 10, Ru.SupportRu(_view.MyHand[i]), Color.White, 15);
+            G.DrawString(batch, r.X + 8, r.Y + 120, "1 любой дайс", Color.LightGray, 12);
+            if (G.ClickOnce(r)) { Sfx.Card(); Send("play_card", new { card_def_id = _view.MyHand[i] }); }
         }
+        if (_view.MyHand.Count == 0)
+            G.DrawString(batch, 900, 620, "Рука пуста", Color.DimGray, 16);
 
-        // действия
-        int by = 600;
-        if (G.Button(batch, new Rectangle(700, by, 130, 50), "Скилл")) { Sfx.Skill(); DoSkill(); }
-        if (G.Button(batch, new Rectangle(840, by, 130, 50), "Ульта")) { Sfx.Skill(); DoUlt(); }
-        if (G.Button(batch, new Rectangle(980, by, 130, 50), "Свап")) DoSwap();
-        if (G.Button(batch, new Rectangle(1120, by, 140, 50), "Конец хода", new Color(120, 60, 60)))
+        // ===== колонка действий (справа) =====
+        int ax = 1148, aw = 114;
+        if (G.Button(batch, new Rectangle(ax, 252, aw, 50), "Скилл")) { Sfx.Skill(); DoSkill(); }
+        if (G.Button(batch, new Rectangle(ax, 310, aw, 50), "Ульта")) { Sfx.Skill(); DoUlt(); }
+        if (G.Button(batch, new Rectangle(ax, 368, aw, 50), "Свап")) DoSwap();
+        if (G.Button(batch, new Rectangle(ax, 426, aw, 50), "Конец хода", new Color(120, 60, 60)))
             Send("end_turn", new { });
     }
 
-    private void DrawSide(SpriteBatch batch, List<CharView> chars, int y, bool isEnemy)
+    private void DrawSide(SpriteBatch batch, List<CharView> chars, int y, int h, bool isEnemy)
     {
+        int gap = 20;
+        int x0 = (1280 - (chars.Count * CardW + (chars.Count - 1) * gap)) / 2;
         float pulse = 0.5f + 0.5f * (float)Math.Sin(DateTime.Now.TimeOfDay.TotalSeconds * 4);
+
         for (int i = 0; i < chars.Count; i++)
         {
             var c = chars[i];
-            var r = new Rectangle(340 + i * 210, y, 195, 150);
+            var r = new Rectangle(x0 + i * (CardW + gap), y, CardW, h);
             bool selected = c.Uid == _selectedFoeUid && isEnemy;
-            bool isActive = !isEnemy && c.Uid == _view.MyActiveUid;
+            bool isActive = isEnemy ? c.Uid == _view.FoeActiveUid : c.Uid == _view.MyActiveUid;
 
-            G.Panel(batch, r, !c.Alive ? new Color(40, 40, 40) : isEnemy ? new Color(70, 45, 50) : new Color(40, 55, 75),
-                isActive ? Color.Gold : selected ? Color.OrangeRed : new Color(60, 64, 84));
+            G.Panel(batch, r,
+                !c.Alive ? new Color(40, 40, 40) : isEnemy ? new Color(70, 45, 50) : new Color(40, 55, 75),
+                !c.Alive ? new Color(60, 60, 60)
+                : isActive ? (isEnemy ? Color.OrangeRed : Color.Gold)
+                : selected ? Color.OrangeRed
+                : new Color(60, 64, 84));
 
             if (isActive && c.Alive)
-                G.Panel(batch, new Rectangle(r.X - 2, r.Y - 2, r.Width + 4, r.Height + 4), Color.Transparent,
-                    new Color((byte)255, (byte)215, (byte)0, (byte)(120 + 100 * pulse)));
+                G.Panel(batch, new Rectangle(r.X - 3, r.Y - 3, r.Width + 6, r.Height + 6), Color.Transparent,
+                    new Color((byte)255, (byte)215, (byte)0, (byte)(110 + 110 * pulse)));
 
-            G.DrawString(batch, r.X + 10, r.Y + 8, Ru.Name(c.DefId), Color.White, 17);
-            G.DrawString(batch, r.X + 10, r.Y + 30, Ru.ElementRu(c.Element), ElColor(c.Element), 14);
-            int rar = Ru.Info(c.DefId)?.Rarity ?? 3;
-            G.DrawString(batch, r.X + r.Width - 62, r.Y + 8, new string('★', rar), IgraGame.RarityColors[rar], 15);
-
-            // портрет (если есть картинка в Assets/chars/{def_id}.png)
+            // портрет слева
             var portrait = Art.Portrait(c.DefId);
+            int tx = r.X + 8;
             if (portrait != null)
-                batch.Draw(portrait, new Rectangle(r.X + r.Width - 58, r.Y + 28, 48, 48), Color.White);
+            {
+                batch.Draw(portrait, new Rectangle(r.X + 6, r.Y + 6, 52, 52), Color.White);
+                tx = r.X + 64;
+            }
+            G.DrawString(batch, tx, r.Y + 8, Ru.Name(c.DefId), Color.White, 15);
+            G.DrawString(batch, tx, r.Y + 28, Ru.ElementRu(c.Element), ElColor(c.Element), 13);
+            int rar = Ru.Info(c.DefId)?.Rarity ?? 3;
+            G.DrawString(batch, tx, r.Y + 46, new string('★', rar), IgraGame.RarityColors[rar], 13);
+            var orb = Orb(c.Element);
+            if (orb != null) batch.Draw(orb, new Rectangle(r.X + r.Width - 24, r.Y + 6, 18, 18), Color.White);
 
-            // анимированный HP-бар
-            int bw = 175, bh = 16, bx = r.X + 10, byy = r.Y + 56;
+            // HP-бар анимированный
+            int bw = CardW - 20, bh = 15, bx = r.X + 10, byy = r.Y + 64;
             G.FillRect(batch, new Rectangle(bx, byy, bw, bh), new Color(40, 20, 20));
             _dispHp.TryGetValue(c.Uid, out int cur);
             cur += (int)((c.Hp - cur) * 0.2f);
@@ -151,17 +215,17 @@ public class BattleScene(IgraGame game) : Scene(game)
             float frac = c.MaxHp > 0 ? (float)cur / c.MaxHp : 0;
             var hpCol = cur <= c.MaxHp / 3 ? Color.OrangeRed : cur <= c.MaxHp * 2 / 3 ? Color.Gold : Color.LightGreen;
             G.FillRect(batch, new Rectangle(bx, byy, (int)(bw * frac), bh), hpCol);
-            G.DrawString(batch, bx + 2, byy, $"{cur}/{c.MaxHp}" + (c.Shield > 0 ? $" (+{c.Shield})" : ""), Color.White, 13);
+            G.DrawString(batch, bx + 2, byy, $"{cur}/{c.MaxHp}" + (c.Shield > 0 ? $" (+{c.Shield})" : ""), Color.White, 12);
 
-            // полоска энергии
-            int ew = 175;
-            G.FillRect(batch, new Rectangle(r.X + 10, r.Y + 80, ew, 8), new Color(20, 20, 40));
+            // энергия
+            G.FillRect(batch, new Rectangle(bx, byy + 20, bw, 7), new Color(20, 20, 40));
             float eFrac = c.EnergyMax > 0 ? (float)c.Energy / c.EnergyMax : 0;
-            G.FillRect(batch, new Rectangle(r.X + 10, r.Y + 80, (int)(ew * eFrac), 8),
+            G.FillRect(batch, new Rectangle(bx, byy + 20, (int)(bw * eFrac), 7),
                 c.Energy >= c.EnergyMax ? Color.Gold : new Color(90, 130, 220));
-            G.DrawString(batch, r.X + 10, r.Y + 92, $"Энергия {c.Energy}/{c.EnergyMax}",
+            G.DrawString(batch, bx, byy + 30, $"Энергия {c.Energy}/{c.EnergyMax}",
                 c.Energy >= c.EnergyMax ? Color.Gold : Color.Silver, 14);
-            if (!c.Alive) G.DrawString(batch, r.X + 50, r.Y + 110, "ПОВЕРЖЕН", Color.Red, 22);
+
+            if (!c.Alive) G.DrawString(batch, r.X + 42, r.Y + h / 2 + 6, "ПОВЕРЖЕН", Color.Red, 20);
 
             if (isEnemy && c.Alive && G.ClickOnce(r))
                 _selectedFoeUid = c.Uid;
@@ -172,8 +236,10 @@ public class BattleScene(IgraGame game) : Scene(game)
     {
         bool enemy = _view.FoeChars.Contains(c);
         var list = enemy ? _view.FoeChars : _view.MyChars;
-        int i = list.IndexOf(c);
-        return new Rectangle(340 + Math.Max(i, 0) * 210, enemy ? 60 : 340, 195, 150);
+        int n = list.Count;
+        int x0 = (1280 - (n * CardW + Math.Max(n - 1, 0) * 20)) / 2;
+        int i = Math.Max(list.IndexOf(c), 0);
+        return new Rectangle(x0 + i * (CardW + 20), enemy ? 48 : 240, CardW, enemy ? 130 : 160);
     }
 
     private void DoSkill()
@@ -197,7 +263,7 @@ public class BattleScene(IgraGame game) : Scene(game)
     private void DoSwap()
     {
         var next = _view.MyChars.FirstOrDefault(c => c.Alive && c.Uid != _view.MyActiveUid);
-        if (next != null) Send("swap_character", new { to_uid = next.Uid });
+        if (next != null) { Sfx.SwapSnd(); Send("swap_character", new { to_uid = next.Uid }); }
     }
 
     private void Send(string type, object payload) => _ = G.Net.SendAsync(type, payload);

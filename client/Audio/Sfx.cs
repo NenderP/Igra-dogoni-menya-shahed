@@ -71,10 +71,24 @@ public static class Sfx
     public static void SwapSnd() => Play("swap");
     public static void Card() => Play("card");
 
+    private static readonly Dictionary<string, float> _vol = new()
+    {
+        ["hit"] = 0.40f, ["death"] = 0.42f, ["skill"] = 0.45f, ["epic"] = 0.48f,
+        ["win"] = 0.50f, ["lose"] = 0.45f, ["click"] = 0.45f, ["pull"] = 0.5f,
+        ["rare"] = 0.45f, ["swap"] = 0.45f, ["card"] = 0.45f, ["start"] = 0.5f
+    };
+
     private static void Play(string name)
     {
         if (Muted) return;
-        if (_map.TryGetValue(name, out var e)) e.Play();
+        if (!_map.TryGetValue(name, out var e)) return;
+        try
+        {
+            var inst = e.CreateInstance();
+            inst.Volume = _vol.GetValueOrDefault(name, 0.55f);
+            inst.Play();
+        }
+        catch { }
     }
 
     public static void ToggleMute()

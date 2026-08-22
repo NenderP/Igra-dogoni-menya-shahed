@@ -8,6 +8,8 @@ public class BattleView
     public int Round { get; set; }
     public string Phase { get; set; } = "action";
     public string MyActiveUid { get; set; } = "";
+    public string FoeActiveUid { get; set; } = "";
+    public int FoeHandCount { get; set; }
     public List<CharView> MyChars { get; } = new();
     public List<CharView> FoeChars { get; } = new();
     public List<string> MyHand { get; set; } = new();
@@ -19,6 +21,8 @@ public class BattleView
     {
         var v = new BattleView { Round = p.Int("round"), Phase = p.Str("phase") ?? "action" };
         v.MyActiveUid = p.Str("active_character") ?? "";
+        v.FoeActiveUid = p.GetProperty("opponent").Str("active") ?? "";
+        v.FoeHandCount = p.GetProperty("opponent").Int("hand_count");
 
         void Fill(JsonElement side, List<CharView> list)
         {

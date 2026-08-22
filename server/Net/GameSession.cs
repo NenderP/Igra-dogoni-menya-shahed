@@ -204,7 +204,8 @@ public class GameSession
         player_id = s.PlayerId,
         characters = s.Characters.Select(CharacterView),
         hand_count = s.Hand.Count,
-        supports_on_field = s.FieldSupports.ToArray()
+        supports_on_field = s.FieldSupports.ToArray(),
+        active = s.Active.Uid
     };
 
     private static object CharacterView(CharacterState c) => new

@@ -4,8 +4,19 @@
 Лицензия: CC0 (https://opengameart.org/content/512-sound-effects-8-bit-style)
 Переименованы: click/hit/skill/win/lose/pull/rare/epic/death/swap/card
 
+Спрайты персонажей: client/Assets/chars/*.png
+Источник: Kenney "Tiny Dungeon" (тайлы 12x12, апскейл x5)
+Автор: Kenney (kenney.nl)
+Лицензия: CC0 (https://kenney.nl/assets/tiny-dungeon)
+
+Иконки стихий: client/Assets/icons/el_*.png
+Источник: Kenney "Particle Pack" (circle_05, перекраска в цвета стихий + альфа из яркости)
+Автор: Kenney (kenney.nl)
+Лицензия: CC0 (https://kenney.nl/assets/particle-pack)
+
 Куда класть своё:
-- Портреты персонажей: Assets/chars/{def_id}.png (например char_day_mage.png), квадратные, лучше 128x128+
+- Портреты персонажей: Assets/chars/{def_id}.png (например char_day_mage.png), квадратные
 - Фон боя: Assets/bg/battle_bg.png (1280x720)
 - Музыка (заменит встроенный синт-луп): Assets/music/theme.ogg или theme.wav
 Файлы подхватываются автоматически при запуске.
+
