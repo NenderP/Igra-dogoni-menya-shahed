@@ -108,9 +108,18 @@ public class BattleScene(IgraGame game) : Scene(game)
             G.FillRect(batch, new Rectangle(fr.X + fr.Width / 2 - 6, fr.Y - 12, 12, 12), Color.Red);
         }
 
-        // ===== лог =====
-        G.Panel(batch, new Rectangle(20, 186, 1240, 42), new Color(20, 22, 32), new Color(60, 64, 84));
-        G.DrawString(batch, 30, 194, _log.Length > 130 ? _log[..130] : _log, Color.LightGoldenrodYellow, 17);
+        // ===== разделитель между командами: постоянный бейдж раунда + строка лога =====
+        var badgeR = new Rectangle(20, 186, 160, 42);
+        G.Panel(batch, badgeR, new Color(32, 36, 54), new Color(120, 110, 60));
+        string rt = $"Раунд {_view.Round}";
+        var rs = G.Measure(rt, 20);
+        G.DrawString(batch, badgeR.X + (badgeR.Width - rs.X) / 2, badgeR.Y + (badgeR.Height - rs.Y) / 2 + 1,
+            rt, Color.Gold, 20);
+
+        var logR = new Rectangle(190, 186, 1070, 42);
+        G.Panel(batch, logR, new Color(20, 22, 32), new Color(60, 64, 84));
+        string shownLog = _log.Length > 100 ? _log[..100] : _log;
+        G.DrawString(batch, logR.X + 12, 194, shownLog, Color.LightGoldenrodYellow, 17);
 
         // ===== мой отряд (центр) =====
         DrawSide(batch, _view.MyChars, y: 240, h: 160, isEnemy: false);
