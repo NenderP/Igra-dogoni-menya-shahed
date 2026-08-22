@@ -71,7 +71,9 @@ public class IgraGame : Game
         Art.Init(GraphicsDevice);
         Sfx.Init();
 
-        Scene = new ConnectScene(this);
+        Scene = Environment.GetEnvironmentVariable("IGRA_CARDTEST") == "1"
+            ? new Scenes.CardTestScene(this)
+            : new ConnectScene(this);
         var _ = Task.Run(async () =>
         {
             try
