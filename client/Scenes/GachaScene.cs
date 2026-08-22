@@ -49,8 +49,8 @@ public class GachaScene(IgraGame game) : Scene(game)
         if (_summary.Length > 0)
             G.DrawString(batch, 60, 232, _summary, Color.YellowGreen, 19);
 
-        // карточки результата (с pop-анимацией)
-        int cardW = 150, cardH = 70, x0 = 60, y0 = 280, gap = 12;
+        // карточки результата (с pop-анимацией, портретом и иерархией редкости)
+        int cardW = 150, cardH = 76, x0 = 60, y0 = 280, gap = 12;
         for (int i = 0; i < _items.Count; i++)
         {
             var it = _items[i];
@@ -60,16 +60,61 @@ public class GachaScene(IgraGame game) : Scene(game)
             int w = (int)(cardW * (0.4f + 0.6f * k));
             int h = (int)(cardH * k);
             var r = new Rectangle(x0 + col * (cardW + gap), y0 + row * (cardH + gap), w, h);
+
             G.FillRect(batch, r, IgraGame.RarityColors[it.Rarity]);
-            var el = Ru.Info(it.DefId)?.Element;
-            if (el != null)
-                G.Panel(batch, r, Color.Transparent, Ru.ElementColor(el));
-            if (h < 14) continue;
-            G.DrawString(batch, r.X + 8, r.Y + 8, new string('★', it.Rarity), Color.White, 18);
-            G.DrawString(batch, r.X + 8, r.Y + 34, Ru.Name(it.DefId), Color.White, 16);
-            G.DrawString(batch, r.X + 8, r.Y + 52,
-                it.IsNew ? "НОВЫЙ!" : $"+{it.Dust} пыли", it.IsNew ? Color.White : Color.LightGray, 16);
+
+            // иерархия редкости
+            if (h >= 20 && w >= cardW - 4)
+            {
+                if (it.Rarity >= 4)
+                {
+                    // свечение вокруг редкой карточки
+                    var rc = IgraGame.RarityColors[it.Rarity];
+                    G.Panel(batch, Inflate(r, 4), Color.Transparent, rc * 0.45f);
+                    G.Panel(batch, Inflate(r, 9), Color.Transparent, rc * 0.22f);
+                    if (it.Rarity == 5)
+                        G.Panel(batch, Inflate(r, 15), Color.Transparent, rc * 0.12f);
+                    // толстая цветная рамка (двойной контур)
+                    G.Panel(batch, Inflate(r, 2), Color.Transparent, rc);
+                    G.Panel(batch, r, Color.Transparent, rc);
+                }
+                else
+                {
+                    // обычная: тонкая серая рамка
+                    G.Panel(batch, r, Color.Transparent, new Color(116, 120, 130));
+                }
+            }
+
+            if (h < 40) continue;
+
+            // портрет слева (если есть пиксель-арт)
+            var portrait = Art.Portrait(it.DefId);
+            int tx = r.X + 8;
+            if (portrait != null)
+            {
+                batch.Draw(portrait, new Rectangle(r.X + 6, r.Y + (h - Math.Min(56, h - 8)) / 2, 56, Math.Min(56, h - 8)), Color.White);
+                tx = r.X + 68;
+            }
+            int tw = r.X + r.Width - tx - 4;
+
+            G.DrawString(batch, tx, r.Y + 6, new string('★', Math.Max(it.Rarity, 0)), Color.White, 13);
+            string nm = Fit(G, Ru.Name(it.DefId), 14, tw);
+            G.DrawString(batch, tx, r.Y + 24, nm, Color.White, 14);
+            G.DrawString(batch, tx, r.Y + 46,
+                it.IsNew ? "НОВЫЙ!" : $"+{it.Dust} пыли", it.IsNew ? Color.White : new Color(230, 230, 235), 13);
         }
+    }
+
+    private static Rectangle Inflate(Rectangle r, int d) =>
+        new(r.X - d, r.Y - d, r.Width + 2 * d, r.Height + 2 * d);
+
+    /// <summary>Обрезает строку под ширину, добавляя «…».</summary>
+    private static string Fit(IgraGame g, string s, float size, float maxW)
+    {
+        if (g.Measure(s, size).X <= maxW) return s;
+        while (s.Length > 1 && g.Measure(s + "…", size).X > maxW)
+            s = s[..^1];
+        return s + "…";
     }
 
     private void UpdateReveal()
@@ -86,7 +131,7 @@ public class GachaScene(IgraGame game) : Scene(game)
             _ages.Add(0);
 
             int col = (_items.Count - 1) % 7, row = (_items.Count - 1) / 7;
-            var center = new Vector2(60 + col * 162 + 75, 280 + row * 82 + 35);
+            var center = new Vector2(60 + col * 162 + 75, 280 + row * 88 + 38);
             Fx.Burst(center, IgraGame.RarityColors[it.Rarity], it.Rarity == 3 ? 8 : 20, it.Rarity == 3 ? 90 : 180);
 
             if (it.Rarity == 5) { Sfx.Epic(); Fx.Flash(Color.Gold, 0.28f); Fx.Shake(8); }
