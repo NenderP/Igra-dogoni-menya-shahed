@@ -26,18 +26,18 @@ public static class Sfx
         }
         catch { /* без файлов — живём на синтезе */ }
 
-        Ensure("click", () => Tone(0.05f, 880, 0.18f));
-        Ensure("start", () => Tone(0.25f, 330, 0.25f, 660));
-        Ensure("skill", () => Tone(0.18f, 240, 0.30f, 520));
+        Ensure("click", () => Tone(0.05f, 520, 0.18f));
+        Ensure("start", () => Tone(0.25f, 220, 0.25f, 440));
+        Ensure("skill", () => Tone(0.18f, 160, 0.30f, 380));
         Ensure("hit", () => Noise(0.13f, 0.35f));
-        Ensure("win", () => Jingle(new[] { 523, 659, 784, 1047 }, 0.12f, 0.30f));
-        Ensure("lose", () => Jingle(new[] { 440, 330, 247, 165 }, 0.14f, 0.30f));
-        Ensure("pull", () => Tone(0.07f, 1200, 0.15f));
-        Ensure("rare", () => Tone(0.20f, 600, 0.25f, 1200));
-        Ensure("epic", () => Jingle(new[] { 784, 988, 1175, 1568 }, 0.10f, 0.32f));
+        Ensure("win", () => Jingle(new[] { 262, 330, 392, 523 }, 0.14f, 0.30f));
+        Ensure("lose", () => Jingle(new[] { 294, 220, 165, 110 }, 0.16f, 0.30f));
+        Ensure("pull", () => Tone(0.07f, 700, 0.15f));
+        Ensure("rare", () => Tone(0.20f, 400, 0.25f, 900));
+        Ensure("epic", () => Jingle(new[] { 392, 494, 587, 784 }, 0.12f, 0.32f));
         Ensure("death", () => Noise(0.28f, 0.30f));
-        Ensure("swap", () => Tone(0.08f, 300, 0.20f));
-        Ensure("card", () => Tone(0.06f, 700, 0.12f));
+        Ensure("swap", () => Tone(0.08f, 200, 0.20f));
+        Ensure("card", () => Tone(0.06f, 420, 0.12f));
 
         try { InitMusic(); } catch { }
     }
@@ -49,11 +49,72 @@ public static class Sfx
 
     private static SoundEffect LoadWav(string path)
     {
+        var bytes = File.ReadAllBytes(path);
+        try
+        {
+            var wav = DecodeWav(bytes);
+            if (wav.HasValue)
+            {
+                var (sr, ch, smp) = wav.Value;
+
+                // проверка на клиппинг: всё выше -1 dBFS приглушаем до -1 dBFS
+                float peak = 0;
+                foreach (var v in smp) peak = MathF.Max(peak, MathF.Abs(v));
+                float db = 20f * MathF.Log10(MathF.Max(peak, 1e-6f));
+                if (peak > 0.891f)
+                {
+                    float g = 0.891f / peak;
+                    for (int i = 0; i < smp.Length; i++) smp[i] *= g;
+                    db = -1f;
+                }
+
+                // короткие фейды по краям убирают щелчки на старте/обрыве
+                FadeEdges(smp, sr, 8);
+
+                Console.WriteLine($"[sfx] {Path.GetFileName(path)}: пик {db:F1} dBFS" +
+                    (peak > 0.891f ? " -> ограничен до -1 dBFS" : ", чисто"));
+                return ToEffectRaw(sr, ch, smp);
+            }
+        }
+        catch { /* не PCM16 — грузим как есть */ }
+
         using var fs = File.OpenRead(path);
         var ms = new MemoryStream();
         fs.CopyTo(ms);
         ms.Position = 0;
         return SoundEffect.FromStream(ms);
+    }
+
+    /// <summary>Разбирает RIFF/WAVE (PCM16, моно/стерео) во float[-1..1]. null — формат не поддержан.</summary>
+    private static (int sr, int ch, float[] smp)? DecodeWav(byte[] b)
+    {
+        if (b.Length < 44 || Encoding.ASCII.GetString(b, 0, 4) != "RIFF") return null;
+        int pos = 12;
+        short fmt = 0, ch = 0;
+        int sr = 0;
+        float[]? smp = null;
+        while (pos + 8 <= b.Length)
+        {
+            string id = Encoding.ASCII.GetString(b, pos, 4);
+            int sz = BitConverter.ToInt32(b, pos + 4);
+            if (sz < 0 || pos + 8 + sz > b.Length) return null;
+            if (id == "fmt ")
+            {
+                fmt = BitConverter.ToInt16(b, pos + 8);
+                ch = BitConverter.ToInt16(b, pos + 10);
+                sr = BitConverter.ToInt32(b, pos + 12);
+            }
+            else if (id == "data")
+            {
+                if (fmt != 1 || (ch != 1 && ch != 2)) return null;
+                smp = new float[sz / 2];
+                for (int i = 0; i < smp.Length; i++)
+                    smp[i] = BitConverter.ToInt16(b, pos + 8 + i * 2) / 32768f;
+            }
+            pos += 8 + sz;
+            if (pos % 2 == 1) pos++;
+        }
+        return smp != null && sr > 0 ? (sr, ch, smp) : null;
     }
 
     // ---------- публичные хелперы ----------
@@ -140,7 +201,7 @@ public static class Sfx
         };
 
         int total = (int)(sr * segDur * chords.Length);
-        var s = new short[total];
+        var s = new float[total];
 
         for (int c = 0; c < chords.Length; c++)
         {
@@ -158,86 +219,119 @@ public static class Sfx
                 v += 0.07f * MathF.Sin(2 * MathF.PI * chords[c][0] / 2 * t);
 
                 int step = (int)(t / (segDur / 8)) % 3;
-                float af = chords[c][step] * 2;
+                float af = chords[c][step];
                 float pluck = MathF.Exp(-((t % (segDur / 8)) * 9));
                 v += 0.06f * MathF.Sin(2 * MathF.PI * af * t) * pluck;
 
-                s[start + i] = (short)(v * env * 32767 * 0.7f);
+                s[start + i] = v * env;
             }
         }
 
-        using var ms = new MemoryStream();
-        using var bw = new BinaryWriter(ms);
-        int dataLen = s.Length * 2;
-        bw.Write(Encoding.ASCII.GetBytes("RIFF")); bw.Write(36 + dataLen);
-        bw.Write(Encoding.ASCII.GetBytes("WAVE"));
-        bw.Write(Encoding.ASCII.GetBytes("fmt ")); bw.Write(16);
-        bw.Write((short)1); bw.Write((short)1); bw.Write(sr); bw.Write(sr * 2); bw.Write((short)2); bw.Write((short)16);
-        bw.Write(Encoding.ASCII.GetBytes("data")); bw.Write(dataLen);
-        foreach (var x in s) bw.Write(x);
-        ms.Position = 0;
-        return SoundEffect.FromStream(ms);
+        for (int i = 0; i < s.Length; i++) s[i] *= 0.7f;
+        LowPass(s, sr, 1800);
+        return ToEffectRaw(sr, 1, s);
     }
 
     // ---------- примитивы синтеза ----------
 
+    /// <summary>Однополюсный low-pass — глушит «писк» высоких частот.</summary>
+    private static void LowPass(float[] s, int sr, float cutoff)
+    {
+        float dt = 1f / sr;
+        float rc = 1f / (2 * MathF.PI * cutoff);
+        float a = dt / (rc + dt), y = 0;
+        for (int i = 0; i < s.Length; i++) { y += a * (s[i] - y); s[i] = y; }
+    }
+
+    /// <summary>Линейные фейды по краям (мс) — убирают щелчки.</summary>
+    private static void FadeEdges(float[] s, int sr, float ms)
+    {
+        int len = Math.Max(1, (int)(sr * ms / 1000f));
+        for (int i = 0; i < len && i < s.Length / 2; i++)
+        {
+            float k = i / (float)len;
+            s[i] *= k;
+            s[s.Length - 1 - i] *= k;
+        }
+    }
+
+    /// <summary>Тон: быстрый атак ~6мс, экспоненциальное затухание, тёплая гармоника вместо чистого писка.</summary>
     private static SoundEffect Tone(float dur, float freq, float vol, float sweepTo = 0)
     {
         int sr = 44100, n = (int)(sr * dur);
-        var s = new short[n];
+        var s = new float[n];
         for (int i = 0; i < n; i++)
         {
             float t = i / (float)sr;
-            float env = (float)Math.Sin(Math.PI * i / n);
+            float att = MathF.Min(1f, t / 0.006f);
+            float env = att * MathF.Exp(-t * 7f);
             float f = sweepTo > 0 ? freq + (sweepTo - freq) * (t / dur) : freq;
-            s[i] = (short)(env * vol * Math.Sin(2 * Math.PI * f * t) * 32767);
+            s[i] = env * vol * (MathF.Sin(2 * MathF.PI * f * t)
+                              + 0.35f * MathF.Sin(4 * MathF.PI * f * t));
         }
-        return FromSamples(sr, s);
+        LowPass(s, sr, 2400);
+        FadeEdges(s, sr, 8);
+        return ToEffectRaw(sr, 1, s);
     }
 
+    /// <summary>Шум: резкий атак, быстрый спад, жёсткий low-pass — глухой удар вместо шипения.</summary>
     private static SoundEffect Noise(float dur, float vol)
     {
         int sr = 44100, n = (int)(sr * dur);
         var rnd = new Random();
-        var s = new short[n];
+        var s = new float[n];
         for (int i = 0; i < n; i++)
         {
-            float env = (float)Math.Sin(Math.PI * i / n);
-            s[i] = (short)(env * vol * (rnd.NextDouble() * 2 - 1) * 32767);
+            float t = i / (float)sr;
+            float env = MathF.Min(1f, t / 0.004f) * MathF.Exp(-t * 14f);
+            s[i] = env * vol * (float)(rnd.NextDouble() * 2 - 1);
         }
-        return FromSamples(sr, s);
+        LowPass(s, sr, 1400);
+        FadeEdges(s, sr, 8);
+        return ToEffectRaw(sr, 1, s);
     }
 
     private static SoundEffect Jingle(int[] notes, float noteDur, float vol)
     {
         int sr = 44100;
-        var list = new List<short>();
+        var list = new List<float>();
         foreach (var f in notes)
         {
             int n = (int)(sr * noteDur);
             for (int i = 0; i < n; i++)
             {
-                float env = (float)Math.Sin(Math.PI * i / n);
-                list.Add((short)(env * vol * Math.Sin(2 * Math.PI * f * (i / (float)sr)) * 32767));
+                float t = i / (float)sr;
+                float att = MathF.Min(1f, t / 0.008f);
+                float env = att * MathF.Exp(-t * 5f);
+                list.Add(env * vol * (MathF.Sin(2 * MathF.PI * f * t)
+                                    + 0.3f * MathF.Sin(4 * MathF.PI * f * t)));
             }
         }
-        return FromSamples(sr, list.ToArray());
+        var s = list.ToArray();
+        LowPass(s, sr, 2600);
+        FadeEdges(s, sr, 8);
+        return ToEffectRaw(sr, 1, s);
     }
 
-    private static SoundEffect FromSamples(int sr, short[] samples)
+    /// <summary>Сборка SoundEffect из float-семплов с мягким лимитером на -1 dBFS.</summary>
+    private static SoundEffect ToEffectRaw(int sr, int ch, float[] s)
     {
+        var outp = new short[s.Length];
+        for (int i = 0; i < s.Length; i++)
+            outp[i] = (short)(Math.Clamp(s[i], -0.891f, 0.891f) * 32767);
+
         using var ms = new MemoryStream();
         using var bw = new BinaryWriter(ms);
-        int dataLen = samples.Length * 2;
+        int dataLen = outp.Length * 2;
         bw.Write(Encoding.ASCII.GetBytes("RIFF"));
         bw.Write(36 + dataLen);
         bw.Write(Encoding.ASCII.GetBytes("WAVE"));
         bw.Write(Encoding.ASCII.GetBytes("fmt "));
-        bw.Write(16); bw.Write((short)1); bw.Write((short)1);
-        bw.Write(sr); bw.Write(sr * 2); bw.Write((short)2); bw.Write((short)16);
+        bw.Write(16); bw.Write((short)1); bw.Write((short)ch);
+        bw.Write(sr); bw.Write(sr * ch * 2); bw.Write((short)(ch * 2)); bw.Write((short)16);
         bw.Write(Encoding.ASCII.GetBytes("data"));
         bw.Write(dataLen);
-        foreach (var x in samples) bw.Write(x);
+        foreach (var x in outp) bw.Write(x);
         ms.Position = 0;
         return SoundEffect.FromStream(ms);
     }
