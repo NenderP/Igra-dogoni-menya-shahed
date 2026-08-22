@@ -14,6 +14,8 @@ public class BattleView
     public List<CharView> FoeChars { get; } = new();
     public List<string> MyHand { get; set; } = new();
     public List<string> MyDice { get; set; } = new();
+    public List<string> MySupports { get; set; } = new();
+    public List<string> FoeSupports { get; set; } = new();
     public int RerollsLeft { get; set; }
     public string? LastLog { get; set; }
 
@@ -47,6 +49,8 @@ public class BattleView
 
         v.MyHand = p.GetProperty("you").Arr("hand").EnumerateArray().Select(x => x.GetString() ?? "").ToList();
         v.MyDice = p.GetProperty("you").Arr("dice").EnumerateArray().Select(x => x.GetString() ?? "").ToList();
+        v.MySupports = p.GetProperty("you").Arr("supports_on_field").EnumerateArray().Select(x => x.GetString() ?? "").ToList();
+        v.FoeSupports = p.GetProperty("opponent").Arr("supports_on_field").EnumerateArray().Select(x => x.GetString() ?? "").ToList();
         v.RerollsLeft = p.GetProperty("you").Int("rerolls_left");
         return v;
     }

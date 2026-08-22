@@ -192,6 +192,74 @@ public class BattleScene(IgraGame game) : Scene(game)
         if (G.Button(batch, new Rectangle(ax, 368, aw, 50), "Свап")) DoSwap();
         if (G.Button(batch, new Rectangle(ax, 426, aw, 50), "Конец хода", new Color(120, 60, 60)))
             Send("end_turn", new { });
+
+        // ===== зона активных эффектов (под кнопками действий) =====
+        DrawEffects(batch);
+    }
+
+    /// <summary>Контейнер «Активные эффекты»: разыгранные карты поддержки моего поля и поля соперника.</summary>
+    private void DrawEffects(SpriteBatch batch)
+    {
+        int ex = 1148, ew = 120;
+        var zone = new Rectangle(ex, 490, ew, 214);
+        G.Panel(batch, zone, new Color(24, 26, 38), new Color(70, 74, 96));
+        G.DrawString(batch, ex + 8, zone.Y + 7, "Активные", Color.Silver, 13);
+        G.DrawString(batch, ex + 8, zone.Y + 24, "эффекты", Color.Silver, 13);
+
+        int cy = zone.Y + 48;
+        bool any = false;
+
+        foreach (var (id, n) in Group(_view.MySupports))
+        {
+            if (cy > zone.Bottom - 32) break;
+            DrawChip(batch, ex + 6, cy, ew - 12, id, n, my: true);
+            cy += 32; any = true;
+        }
+        if (_view.FoeSupports.Count > 0 && cy <= zone.Bottom - 50)
+        {
+            G.DrawString(batch, ex + 8, cy, "Соперник:", new Color(214, 120, 124), 12);
+            cy += 20;
+            foreach (var (id, n) in Group(_view.FoeSupports))
+            {
+                if (cy > zone.Bottom - 30) break;
+                DrawChip(batch, ex + 6, cy, ew - 12, id, n, my: false);
+                cy += 32;
+            }
+            any = true;
+        }
+
+        if (!any)
+            G.DrawString(batch, ex + 8, cy + 4, "— пусто —", new Color(90, 94, 110), 13);
+    }
+
+    private void DrawChip(SpriteBatch batch, int x, int y, int w, string supId, int count, bool my)
+    {
+        var r = new Rectangle(x, y, w, 26);
+        G.Panel(batch, r,
+            my ? new Color(46, 66, 52) : new Color(70, 45, 48),
+            my ? new Color(110, 150, 115) : new Color(160, 100, 105));
+        string label = Ru.SupportRu(supId) + (count > 1 ? $" ×{count}" : "");
+        G.DrawString(batch, r.X + 5, r.Y + 5, Fit(label, 12, w - 10), Color.White, 12);
+    }
+
+    private static List<(string id, int n)> Group(List<string> src)
+    {
+        var res = new List<(string id, int n)>();
+        foreach (var s in src)
+        {
+            int i = res.FindIndex(t => t.id == s);
+            if (i >= 0) res[i] = (res[i].id, res[i].n + 1);
+            else res.Add((s, 1));
+        }
+        return res;
+    }
+
+    private string Fit(string s, float size, float maxW)
+    {
+        if (G.Measure(s, size).X <= maxW) return s;
+        while (s.Length > 1 && G.Measure(s + "…", size).X > maxW)
+            s = s[..^1];
+        return s + "…";
     }
 
     private void DrawSide(SpriteBatch batch, List<CharView> chars, int y, int h, bool isEnemy)
