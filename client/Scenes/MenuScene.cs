@@ -42,7 +42,8 @@ public class MenuScene(IgraGame game) : Scene(game)
 
         if (_notice.Length > 0)
             G.DrawString(batch, 60, 530, _notice, Color.Yellow, 20);
-        G.DrawString(batch, 60, 660, $"player_id: {G.PlayerId}", Color.DimGray, 16);
+        if (Core.DebugConfig.Enabled)
+            G.DrawString(batch, 60, 660, $"player_id: {G.PlayerId}", Color.DimGray, 16);
     }
 
     public override void OnMessage(string type, JsonElement payload)

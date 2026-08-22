@@ -52,6 +52,10 @@ public static class Ru
 
     public static string SupportRu(string defId) => Supports.TryGetValue(defId, out var v) ? v : defId.Replace("sup_", "");
 
+    /// <summary>Все id карт поддержки — для подмены в логах.</summary>
+    public static readonly System.Collections.Generic.IReadOnlyList<string> SupportIds =
+        Supports.Keys.ToList();
+
     public static Color ElementColor(string key) => key switch
     {
         "dawn" => new Color(250, 200, 120),

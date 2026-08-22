@@ -39,13 +39,15 @@ public class BattleScene(IgraGame game) : Scene(game)
 
             case "action_result":
             {
-                _log = payload.Str("log") ?? "";
+                var raw = payload.Str("log") ?? "";
                 Sfx.Hit();
-                var m = System.Text.RegularExpressions.Regex.Match(_log, @"на (\d+)");
+
+                // урон/жертву определяем по сырому логу (там технические id)
+                var m = System.Text.RegularExpressions.Regex.Match(raw, @"на (\d+)");
                 int dmg = m.Success ? int.Parse(m.Groups[1].Value) : 0;
-                bool reaction = _log.Contains("Реакция");
+                bool reaction = raw.Contains("Реакция");
                 var victim = _view.MyChars.Concat(_view.FoeChars)
-                    .FirstOrDefault(c => c.DefId.Length > 0 && _log.Contains(c.DefId));
+                    .FirstOrDefault(c => c.DefId.Length > 0 && raw.Contains(c.DefId));
                 if (victim != null)
                 {
                     var r = CardRect(victim);
@@ -58,13 +60,16 @@ public class BattleScene(IgraGame game) : Scene(game)
                         Fx.Shake(reaction || dmg >= 10 ? 7 : 4);
                         if (reaction) Fx.Flash(Color.Gold, 0.10f);
                     }
-                    if (_log.Contains("пал!"))
+                    if (raw.Contains("пал!"))
                     {
                         Sfx.Death();
                         Fx.Burst(new Vector2(r.X + r.Width / 2, r.Y + r.Height / 2), Color.Gray, 26, 190);
                         Fx.Shake(9, 0.3f);
                     }
                 }
+
+                // игроку показываем лог без технических идентификаторов
+                _log = PrettifyLog(raw);
                 break;
             }
 
@@ -230,6 +235,24 @@ public class BattleScene(IgraGame game) : Scene(game)
             if (isEnemy && c.Alive && G.ClickOnce(r))
                 _selectedFoeUid = c.Uid;
         }
+    }
+
+    /// <summary>
+    /// Убирает из лога технические идентификаторы: char_*/sup_* → русские имена,
+    /// id игрока → «Ты», bot_* → «Бот». Под IGRA_DEBUG лог остаётся сырым.
+    /// </summary>
+    private string PrettifyLog(string log)
+    {
+        if (Core.DebugConfig.Enabled) return log;
+
+        foreach (var c in Ru.Characters)
+            log = log.Replace(c.DefId, c.Name);
+        foreach (var s in Ru.SupportIds)
+            log = log.Replace(s, Ru.SupportRu(s));
+        if (!string.IsNullOrEmpty(G.PlayerId))
+            log = log.Replace(G.PlayerId, "Ты");
+        log = System.Text.RegularExpressions.Regex.Replace(log, @"bot_\w+", "Бот");
+        return log;
     }
 
     private Rectangle CardRect(CharView c)
