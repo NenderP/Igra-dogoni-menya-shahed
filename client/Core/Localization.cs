@@ -56,13 +56,18 @@ public static class Ru
     public static readonly System.Collections.Generic.IReadOnlyList<string> SupportIds =
         Supports.Keys.ToList();
 
+    /// <summary>
+    /// Единая палитра стихий (те же хексы, что красят дайсы):
+    /// Затмение — фиолетовый, Рассвет — золото, День — оранжевый,
+    /// Сумерки — сиреневый, Ночь — синий.
+    /// </summary>
     public static Color ElementColor(string key) => key switch
     {
         "dawn" => new Color(250, 200, 120),
-        "day" => new Color(250, 240, 150),
+        "day" => new Color(248, 158, 68),
         "eclipse" => new Color(160, 90, 220),
-        "twilight" => new Color(140, 110, 180),
-        "night" => new Color(70, 90, 170),
+        "twilight" => new Color(150, 116, 190),
+        "night" => new Color(84, 104, 190),
         _ => Color.Gray
     };
 }

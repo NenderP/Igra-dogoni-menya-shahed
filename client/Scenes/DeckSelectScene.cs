@@ -27,8 +27,11 @@ public class DeckSelectScene(IgraGame game) : Scene(game)
             var r = new Rectangle(x0 + col * (cw + gx), y0 + row * (ch + gy), cw, ch);
             bool selected = _sel.Contains(c.DefId);
 
+            // рамка = цвет стихии; выбранная карточка получает внешний золотой контур
             G.Panel(batch, r, selected ? new Color(40, 60, 90) : new Color(28, 30, 42),
-                selected ? Color.Gold : new Color(60, 64, 84));
+                Ru.ElementColor(c.Element));
+            if (selected)
+                G.Panel(batch, new Rectangle(r.X - 3, r.Y - 3, cw + 6, ch + 6), Color.Transparent, Color.Gold);
 
             // портрет (если есть картинка в Assets/chars/{def_id}.png)
             var portrait = Art.Portrait(c.DefId);

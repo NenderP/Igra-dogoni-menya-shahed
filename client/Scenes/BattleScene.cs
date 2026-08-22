@@ -137,7 +137,7 @@ public class BattleScene(IgraGame game) : Scene(game)
                 batch.Draw(orb, r, picked ? Color.White * 1f : Color.White * 0.75f);
             else
                 G.FillRect(batch, r, ElColor(el) * (picked ? 1f : 0.75f));
-            G.Panel(batch, r, Color.Transparent, picked ? Color.White : new Color(50, 54, 70));
+            G.Panel(batch, r, Color.Transparent, picked ? Color.White : ElColor(el));
             G.DrawString(batch, r.X + 16, r.Y + 38, Ru.ElementShort(el), picked ? Color.Black : new Color(20, 20, 26), 14);
 
             if (G.ClickOnce(r))
@@ -193,16 +193,19 @@ public class BattleScene(IgraGame game) : Scene(game)
             bool selected = c.Uid == _selectedFoeUid && isEnemy;
             bool isActive = isEnemy ? c.Uid == _view.FoeActiveUid : c.Uid == _view.MyActiveUid;
 
+            // рамка карточки = цвет стихии
+            var elBorder = c.Alive ? ElColor(c.Element) : new Color(60, 60, 60);
             G.Panel(batch, r,
                 !c.Alive ? new Color(40, 40, 40) : isEnemy ? new Color(70, 45, 50) : new Color(40, 55, 75),
-                !c.Alive ? new Color(60, 60, 60)
-                : isActive ? (isEnemy ? Color.OrangeRed : Color.Gold)
-                : selected ? Color.OrangeRed
-                : new Color(60, 64, 84));
+                elBorder);
 
+            // активный/выбранный — внешний контур поверх рамки стихии
             if (isActive && c.Alive)
                 G.Panel(batch, new Rectangle(r.X - 3, r.Y - 3, r.Width + 6, r.Height + 6), Color.Transparent,
                     new Color((byte)255, (byte)215, (byte)0, (byte)(110 + 110 * pulse)));
+            else if (selected && isEnemy)
+                G.Panel(batch, new Rectangle(r.X - 2, r.Y - 2, r.Width + 4, r.Height + 4), Color.Transparent,
+                    Color.OrangeRed);
 
             // портрет слева
             var portrait = Art.Portrait(c.DefId);
