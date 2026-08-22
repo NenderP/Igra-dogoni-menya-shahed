@@ -35,10 +35,7 @@ public class MenuScene(IgraGame game) : Scene(game)
         if (G.Button(batch, new Rectangle(490, 452, 145, 54), "Гача"))
             G.Scene = new GachaScene(G);
         if (G.Button(batch, new Rectangle(645, 452, 145, 54), "Коллекция"))
-        {
-            Send("collection_sync", new { });
-            _notice = "Загружаю коллекцию...";
-        }
+            G.Scene = new CollectionScene(G);
 
         if (_notice.Length > 0)
             G.DrawString(batch, 60, 530, _notice, Color.Yellow, 20);
