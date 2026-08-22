@@ -148,11 +148,38 @@ public class IgraGame : Game
     /// <summary>Белый пиксель 1x1 (кэшируется).</summary>
     public Texture2D White => _whiteTex ??= CreateWhite();
 
+    /// <summary>Белый скруглённый квадрат с антиалиасным краем — форма дайсов.</summary>
+    public Texture2D RoundTex => _roundTex ??= CreateRounded(GraphicsDevice, 128, 22);
+
+    private Texture2D? _roundTex;
+
     private Texture2D CreateWhite()
     {
         var t = new Texture2D(GraphicsDevice, 1, 1);
         t.SetData(new[] { Color.White });
         return t;
+    }
+
+    private static Texture2D CreateRounded(GraphicsDevice gd, int size, int rad)
+    {
+        var data = new Color[size * size];
+        float c = (size - 1) / 2f;
+        float half = size / 2f - 1f;
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float qx = MathF.Abs(x - c) - (half - rad);
+                float qy = MathF.Abs(y - c) - (half - rad);
+                float dx = MathF.Max(qx, 0), dy = MathF.Max(qy, 0);
+                float d = MathF.Sqrt(dx * dx + dy * dy) + MathF.Min(MathF.Max(qx, qy), 0) - rad;
+                byte a = (byte)(255 * Math.Clamp(0.5f - d, 0f, 1f));
+                data[y * size + x] = new Color(255, 255, 255, a);
+            }
+        }
+        var tex = new Texture2D(gd, size, size);
+        tex.SetData(data);
+        return tex;
     }
 
     /// <summary>Рисует фон: картинка из Assets/bg, иначе градиент.</summary>

@@ -132,13 +132,27 @@ public class BattleScene(IgraGame game) : Scene(game)
             var el = _view.MyDice[i];
             var r = new Rectangle(30 + colI * 66, 428 + rowI * 66, 58, 58);
             bool picked = _selDice.Contains(i);
+            var baseC = ElColor(el);
+
+            // кубик: скруглённый квадрат, рамка на два тона светлее заливки
+            if (picked)
+                batch.Draw(G.RoundTex, Inflate(r, 6), Color.White * 0.85f);
+            batch.Draw(G.RoundTex, Inflate(r, 3), picked ? Color.White : Color.Lerp(baseC, Color.White, 0.45f));
+            batch.Draw(G.RoundTex, r, baseC * (picked ? 1f : 0.82f));
+
+            // пиктограмма стихии в центре
             var orb = Orb(el);
             if (orb != null)
-                batch.Draw(orb, r, picked ? Color.White * 1f : Color.White * 0.75f);
+            {
+                int isz = 36;
+                batch.Draw(orb, new Rectangle(r.X + (r.Width - isz) / 2, r.Y + (r.Height - isz) / 2, isz, isz),
+                    picked ? Color.White : Color.White * 0.95f);
+            }
             else
-                G.FillRect(batch, r, ElColor(el) * (picked ? 1f : 0.75f));
-            G.Panel(batch, r, Color.Transparent, picked ? Color.White : ElColor(el));
-            G.DrawString(batch, r.X + 16, r.Y + 38, Ru.ElementShort(el), picked ? Color.Black : new Color(20, 20, 26), 14);
+            {
+                G.DrawString(batch, r.X + 16, r.Y + 38, Ru.ElementShort(el),
+                    picked ? Color.Black : new Color(20, 20, 26), 14);
+            }
 
             if (G.ClickOnce(r))
             {
@@ -266,6 +280,9 @@ public class BattleScene(IgraGame game) : Scene(game)
         log = System.Text.RegularExpressions.Regex.Replace(log, @"bot_\w+", "Бот");
         return log;
     }
+
+    private static Rectangle Inflate(Rectangle r, int d) =>
+        new(r.X - d, r.Y - d, r.Width + 2 * d, r.Height + 2 * d);
 
     private Rectangle CardRect(CharView c)
     {
