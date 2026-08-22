@@ -174,7 +174,7 @@ public class IgraGame : Game
                 float dx = MathF.Max(qx, 0), dy = MathF.Max(qy, 0);
                 float d = MathF.Sqrt(dx * dx + dy * dy) + MathF.Min(MathF.Max(qx, qy), 0) - rad;
                 byte a = (byte)(255 * Math.Clamp(0.5f - d, 0f, 1f));
-                data[y * size + x] = new Color(255, 255, 255, a);
+                data[y * size + x] = new Color((byte)255, (byte)255, (byte)255, a);
             }
         }
         var tex = new Texture2D(gd, size, size);
