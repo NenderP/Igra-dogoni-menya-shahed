@@ -10,6 +10,9 @@ namespace Igra.Client.Scenes;
 /// <summary>Экран гачи: крутки, результаты с цветами редкости, коллекция, крафт пылью.</summary>
 public class GachaScene(IgraGame game) : Scene(game)
 {
+    /// <summary>Минимальный отступ контента от краёв экрана.</summary>
+    private const int Margin = 16;
+
     private readonly List<(int Rarity, string DefId, bool IsNew, int Dust)> _items = new();
     private readonly List<(int Rarity, string DefId, bool IsNew, int Dust)> _pending = new();
     private readonly List<float> _ages = new();
@@ -26,7 +29,11 @@ public class GachaScene(IgraGame game) : Scene(game)
         UpdateReveal();
 
         G.DrawString(batch, 520, 30, "ГАЧА", Color.Gold, 40);
-        G.DrawString(batch, 20, 36, $"Круток: {_pullsLeft}   Пыль: {_dust}", Color.LightGray, 20);
+
+        // баланс в правом верхнем углу (правое выравнивание, не пересекается с кнопкой «← Меню»)
+        string status = $"Круток: {_pullsLeft}   Пыль: {_dust}";
+        float sw = G.Measure(status, 20).X;
+        G.DrawString(batch, 1280 - Margin - sw, 14, status, Color.LightGray, 20);
 
         if (G.Button(batch, new Rectangle(380, 110, 200, 54), "Крутить ×1"))
             TryPull(1);
